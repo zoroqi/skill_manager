@@ -3,8 +3,8 @@ package config
 
 import (
 	"encoding/json"
-	"testing"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestConfigJSONFormat(t *testing.T) {
@@ -14,6 +14,10 @@ func TestConfigJSONFormat(t *testing.T) {
 		Name:        "golang-pro",
 		Path:        "/some/path",
 		Description: "A skill",
+		Metadata: map[string]any{
+			"scope":         "universal",
+			"allowed-tools": []string{"Read", "Write"},
+		},
 	}
 	baseConfig := BaseConfig{
 		Version: "1.0",

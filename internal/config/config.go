@@ -2,10 +2,11 @@
 package config
 
 type Skill struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	Description string `json:"description"`
+	ID          string         `json:"id" yaml:"-"`
+	Name        string         `json:"name" yaml:"name"`
+	Path        string         `json:"path" yaml:"-"`
+	Description string         `json:"description" yaml:"description"`
+	Metadata    map[string]any `json:"metadata" yaml:",inline"`
 }
 
 type BaseConfig struct {
