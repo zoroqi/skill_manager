@@ -1,15 +1,15 @@
 package config
 
 import (
+	"github.com/stretchr/testify/assert"
 	"path/filepath"
 	"testing"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestSaveAndLoadBaseConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	manager := NewManager(tempDir)
-	
+
 	err := manager.Init()
 	assert.NoError(t, err)
 

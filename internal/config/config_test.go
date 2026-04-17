@@ -44,10 +44,12 @@ func TestConfigJSONFormat(t *testing.T) {
 
 	// 3. Context Config
 	contextConfig := ContextConfig{
-		Version:      "1.0",
-		Scope:        "project",
-		TargetDir:    "/project/dir",
-		ActiveSkills: []string{"e4d909c290d0fb1ca068ffaddf22cbd0"},
+		Version:   "1.0",
+		Scope:     "project",
+		TargetDir: "/project/dir",
+		ActiveSkills: []SkillUsage{
+			{ID: "e4d909c290d0fb1ca068ffaddf22cbd0", Agents: []string{"gemini"}},
+		},
 		ActiveGroups: []string{"g1"},
 	}
 	data, err = json.Marshal(contextConfig)

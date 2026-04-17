@@ -58,11 +58,12 @@ func (m *Manager) Init() error {
 
 	// Initialize Global Context Config
 	globalContext := ContextConfig{
-		Version:      "1.0",
-		Scope:        "global",
-		TargetDir:    m.configDir,
-		ActiveSkills: []string{},
-		ActiveGroups: []string{},
+		Version:        "1.0",
+		Scope:          "global",
+		TargetDir:      m.configDir,
+		ActiveSkills:   []SkillUsage{},
+		InactiveSkills: []SkillUsage{},
+		ActiveGroups:   []string{},
 	}
 	if err := m.SaveContextConfig(globalContext, "global_context.json"); err != nil {
 		return err
@@ -136,4 +137,142 @@ func (m *Manager) loadJSON(filename string, v any) error {
 		return err
 	}
 	return json.Unmarshal(data, v)
+}
+
+func mergeAgents(old, new []string) []string {
+	m := make(map[string]bool)
+	for _, a := range old {
+		m[a] = true
+	}
+	for _, a := range new {
+		m[a] = true
+	}
+	res := []string{}
+	for a := range m {
+		res = append(res, a)
+	}
+	return res
+}
+
+// AddSkillToContext adds a skill to the specified context config.
+func (m *Manager) AddSkillToContext(cfg *ContextConfig, skillID string, agents []string) {
+	// Remove from Inactive if it exists there
+	newInactive := []SkillUsage{}
+	for _, usage := range cfg.InactiveSkills {
+		if usage.ID != skillID {
+			newInactive = append(newInactive, usage)
+		}
+	}
+	cfg.InactiveSkills = newInactive
+
+	// Check if already in Active
+	for i, usage := range cfg.ActiveSkills {
+		if usage.ID == skillID {
+			cfg.ActiveSkills[i].Agents = mergeAgents(usage.Agents, agents)
+			return
+		}
+	}
+
+	// Add to Active
+	cfg.ActiveSkills = append(cfg.ActiveSkills, SkillUsage{ID: skillID, Agents: agents})
+}
+
+// EnsureLocalContext ensures a local context exists or creates a new one.
+func EnsureLocalContext(targetDir string) (ContextConfig, error) {
+	path := filepath.Join(targetDir, ".context.json")
+	var cfg ContextConfig
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ContextConfig{
+				Version:        "1.0",
+				Scope:          "project",
+				TargetDir:      targetDir,
+				ActiveSkills:   []SkillUsage{},
+				InactiveSkills: []SkillUsage{},
+				ActiveGroups:   []string{},
+			}, nil
+		}
+		return cfg, err
+	}
+	err = json.Unmarshal(data, &cfg)
+	return cfg, err
+}
+
+// SaveLocalContext saves the local context config.
+func SaveLocalContext(targetDir string, cfg ContextConfig) error {
+	path := filepath.Join(targetDir, ".context.json")
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// RemoveSkillFromContext completely removes a skill from the context.
+func (m *Manager) RemoveSkillFromContext(cfg *ContextConfig, skillID string) {
+	newActive := []SkillUsage{}
+	for _, usage := range cfg.ActiveSkills {
+		if usage.ID != skillID {
+			newActive = append(newActive, usage)
+		}
+	}
+	cfg.ActiveSkills = newActive
+
+	newInactive := []SkillUsage{}
+	for _, usage := range cfg.InactiveSkills {
+		if usage.ID != skillID {
+			newInactive = append(newInactive, usage)
+		}
+	}
+	cfg.InactiveSkills = newInactive
+}
+
+// StopSkillInContext moves a skill from active to inactive.
+func (m *Manager) StopSkillInContext(cfg *ContextConfig, skillID string, agents []string) {
+	var targetUsage *SkillUsage
+	newActive := []SkillUsage{}
+
+	for _, usage := range cfg.ActiveSkills {
+		if usage.ID == skillID {
+			if len(agents) == 0 {
+				// Stop all agents
+				targetUsage = &usage
+			} else {
+				// Stop specific agents
+				newAgents := []string{}
+				agentMap := make(map[string]bool)
+				for _, a := range agents {
+					agentMap[a] = true
+				}
+				for _, a := range usage.Agents {
+					if !agentMap[a] {
+						newAgents = append(newAgents, a)
+					}
+				}
+
+				if len(newAgents) > 0 {
+					usage.Agents = newAgents
+					newActive = append(newActive, usage)
+				} else {
+					// All agents for this skill are stopped
+					targetUsage = &usage
+				}
+			}
+		} else {
+			newActive = append(newActive, usage)
+		}
+	}
+	cfg.ActiveSkills = newActive
+
+	if targetUsage != nil {
+		// Move to InactiveSkills, merge if already there
+		for i, usage := range cfg.InactiveSkills {
+			if usage.ID == skillID {
+				cfg.InactiveSkills[i].Agents = mergeAgents(usage.Agents, targetUsage.Agents)
+				return
+			}
+		}
+		cfg.InactiveSkills = append(cfg.InactiveSkills, *targetUsage)
+	}
 }
