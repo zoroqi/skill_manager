@@ -15,37 +15,56 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
   - `description`: 技能描述。
   - `metadata`: `map[string]any`，用於存儲從 `SKILL.md` 中解析出的 YAML 前言資訊。
 
-### 2.2 上下文配置 (.context.json / global_context.json)
+### 2.2 技能組 (groups.json)
+儲存使用者定義的技能包 (Skill Packs)。
+- **ID:** 使用分組名稱作為 ID。
+- **核心字段:**
+  - `id`: 唯一識別碼。
+  - `name`: 分組名稱。
+  - `description`: 分組描述。
+  - `skill_ids`: 字串列表，記錄該分組包含的所有技能 ID。
+
+### 2.3 上下文配置 (.context.json / global_context.json)
 記錄當前專案或全局環境下的技能使用狀態。
 - **技能使用狀況 (SkillUsage):**
   - `id`: 技能 ID。
   - `agents`: 字串列表，記錄該技能被軟鏈到了哪些 Agent（如 `["gemini", "claude"]`）。
 - **ContextConfig:**
   - `scope`: `global` 或 `project`。
-  - `active_skills`: `[]SkillUsage`，記錄目前啟用的技能及其關聯的 Agent。
+  - `active_skills`: `[]SkillUsage`，記錄目前啟用的單體技能及其關聯的 Agent。
   - `inactive_skills`: `[]SkillUsage`，記錄目前已停用但保留在專案配置中的技能。
+  - `active_groups`: `[]string`，記錄目前啟用的技能組名稱清單。
 
 ## 3. 功能邏輯
 
 ### 3.1 技能掃描 (Scanner)
-- 透過偵測目錄內是否存在 `SKILL.md` 來識別技能。
-- 支援解析 `SKILL.md` 頭部的 YAML Frontmatter。
+...
 
 ### 3.2 技能生命週期管理
 - **Add:**
-  - 將技能加入 `active_skills`。
+  - 支援 `--group <name>`：將分組加入 `active_groups`。
+  - 支援單體技能：將技能加入 `active_skills`。
   - 若指定多個 Agent，會合併現有的 `agents` 名單。
-  - 自動從 `inactive_skills` 移除該技能（若存在）。
-  - 在指定的 Agent 目錄（如 `.gemini/skills/`）建立軟鏈。
+  - 自動觸發 **Sync** 邏輯。
 - **Stop:**
   - 根據 `--agent` 指定移除特定 Agent 下的軟鏈。
   - 更新 `active_skills` 中的 `agents` 名單。
-  - 當技能不再有關聯的 Agent 時，將其移至 `inactive_skills`。
 - **Remove:**
-  - 徹底移除該技能的所有軟鏈。
-  - 從 `active_skills` 和 `inactive_skills` 中完全刪除該技能。
+  - 支援 `--group <name>`：從 `active_groups` 中移除分組。
+  - 支援單體技能：從 `active_skills` 完全刪除。
+  - 自動觸發 **Sync** 邏輯。
+- **Sync:**
+  - 計算預期狀態：結合 `active_skills` 與 `active_groups` 內的所有技能，決定每個 Agent 目錄下應該存在的軟鏈。
+  - 套用變更：建立缺失的軟鏈，並移除多餘的「孤兒」軟鏈。
+  - **衝突處理:** 若目標位置已存在非對應的檔案或連結，且未提供 `--force` 參數，則中止操作並提示衝突。
 - **Status:**
-  - 展示當前上下文的所有活性與停用技能，並列出每個技能關聯的 Agent 清單。
+  - 展示當前上下文的所有活性技能、啟用的分組及停用技能。
+
+## 4. 命令結構 (CLI)
+- **group:** 管理技能組（create, delete, add-skill, remove-skill, list）。
+- **add / remove:** 支援單體技能或使用 `--group` 標誌。
+- **sync:** 強制同步專案環境與配置狀態。
+- **scan:** 更新全局技能庫。
 
 ## 4. 目錄與配置
 - **全局配置:** 預設為 `~/.skill_manager`。

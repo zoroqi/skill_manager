@@ -2,8 +2,10 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 type Manager struct {
@@ -119,6 +121,232 @@ func (m *Manager) LoadContextConfig(filename string) (ContextConfig, error) {
 	var cfg ContextConfig
 	err := m.loadJSON(filename, &cfg)
 	return cfg, err
+}
+
+// GetGroup finds a group by name.
+func (m *Manager) GetGroup(name string) (*Group, error) {
+	cfg, err := m.LoadGroupsConfig()
+	if err != nil {
+		return nil, err
+	}
+	for i, g := range cfg.Groups {
+		if g.Name == name {
+			return &cfg.Groups[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// CreateGroup adds a new empty group.
+func (m *Manager) CreateGroup(name, description string) error {
+	cfg, err := m.LoadGroupsConfig()
+	if err != nil {
+		return err
+	}
+	for _, g := range cfg.Groups {
+		if g.Name == name {
+			return fmt.Errorf("group '%s' already exists", name)
+		}
+	}
+	cfg.Groups = append(cfg.Groups, Group{
+		ID:          name, // Using name as ID for simplicity
+		Name:        name,
+		Description: description,
+		SkillIDs:    []string{},
+	})
+	return m.SaveGroupsConfig(cfg)
+}
+
+// DeleteGroup removes a group.
+func (m *Manager) DeleteGroup(name string) error {
+	cfg, err := m.LoadGroupsConfig()
+	if err != nil {
+		return err
+	}
+	newGroups := []Group{}
+	found := false
+	for _, g := range cfg.Groups {
+		if g.Name == name {
+			found = true
+			continue
+		}
+		newGroups = append(newGroups, g)
+	}
+	if !found {
+		return fmt.Errorf("group '%s' not found", name)
+	}
+	cfg.Groups = newGroups
+	return m.SaveGroupsConfig(cfg)
+}
+
+// AddSkillToGroup adds a skill ID to a group.
+func (m *Manager) AddSkillToGroup(groupName, skillID string) error {
+	cfg, err := m.LoadGroupsConfig()
+	if err != nil {
+		return err
+	}
+	for i, g := range cfg.Groups {
+		if g.Name == groupName {
+			if slices.Contains(g.SkillIDs, skillID) {
+				return nil // Already exists
+			}
+			cfg.Groups[i].SkillIDs = append(cfg.Groups[i].SkillIDs, skillID)
+			return m.SaveGroupsConfig(cfg)
+		}
+	}
+	return fmt.Errorf("group '%s' not found", groupName)
+}
+
+// RemoveSkillFromGroup removes a skill ID from a group.
+func (m *Manager) RemoveSkillFromGroup(groupName, skillID string) error {
+	cfg, err := m.LoadGroupsConfig()
+	if err != nil {
+		return err
+	}
+	for i, g := range cfg.Groups {
+		if g.Name == groupName {
+			newSkillIDs := []string{}
+			found := false
+			for _, id := range g.SkillIDs {
+				if id == skillID {
+					found = true
+					continue
+				}
+				newSkillIDs = append(newSkillIDs, id)
+			}
+			if !found {
+				return nil // Not in group
+			}
+			cfg.Groups[i].SkillIDs = newSkillIDs
+			return m.SaveGroupsConfig(cfg)
+		}
+	}
+	return fmt.Errorf("group '%s' not found", groupName)
+}
+
+// SyncContext synchronizes the symlinks in the target directory based on the context config.
+func (m *Manager) SyncContext(targetDir string, ctxCfg *ContextConfig, force bool) error {
+	baseCfg, err := m.LoadBaseConfig()
+	if err != nil {
+		return err
+	}
+	groupsCfg, err := m.LoadGroupsConfig()
+	if err != nil {
+		return err
+	}
+
+	skillMap := make(map[string]Skill)
+	for _, s := range baseCfg.Skills {
+		skillMap[s.ID] = s
+	}
+
+	groupMap := make(map[string]Group)
+	for _, g := range groupsCfg.Groups {
+		groupMap[g.Name] = g
+	}
+
+	// Calculate desired state: skillID -> []agents
+	desiredSkills := make(map[string][]string)
+
+	// Add individual active skills
+	for _, usage := range ctxCfg.ActiveSkills {
+		desiredSkills[usage.ID] = mergeAgents(desiredSkills[usage.ID], usage.Agents)
+	}
+
+	// Add skills from active groups
+	// Groups are applied to all existing agents in the project
+	existingAgents := FindExistingAgents(targetDir)
+	for _, groupName := range ctxCfg.ActiveGroups {
+		if group, ok := groupMap[groupName]; ok {
+			for _, skillID := range group.SkillIDs {
+				desiredSkills[skillID] = mergeAgents(desiredSkills[skillID], existingAgents)
+			}
+		}
+	}
+
+	// For each agent, collect which skills should be there
+	agentToSkills := make(map[string]map[string]string) // agent -> skillName -> skillPath
+	for skillID, agents := range desiredSkills {
+		skill, ok := skillMap[skillID]
+		if !ok {
+			continue
+		}
+		for _, agent := range agents {
+			if agentToSkills[agent] == nil {
+				agentToSkills[agent] = make(map[string]string)
+			}
+			agentToSkills[agent][skill.Name] = skill.Path
+		}
+	}
+
+	// Apply symlinks for all agents in the project
+	for _, agent := range existingAgents {
+		skills := agentToSkills[agent]
+		if skills == nil {
+			skills = make(map[string]string)
+		}
+
+		skillsDir, err := EnsureAgentSkillsDir(targetDir, agent)
+		if err != nil {
+			return err
+		}
+
+		// List current files in skills directory to find orphans
+		entries, err := os.ReadDir(skillsDir)
+		if err != nil {
+			return err
+		}
+		currentFiles := make(map[string]bool)
+		for _, entry := range entries {
+			currentFiles[entry.Name()] = true
+		}
+
+		for skillName, skillPath := range skills {
+			linkPath := filepath.Join(skillsDir, skillName)
+			delete(currentFiles, skillName)
+
+			if info, err := os.Lstat(linkPath); err == nil {
+				// File exists, check if it's correct
+				if info.Mode()&os.ModeSymlink != 0 {
+					target, err := os.Readlink(linkPath)
+					if err == nil && target == skillPath {
+						// Already correct
+						continue
+					}
+				}
+
+				// Conflict or incorrect
+				if !force {
+					return fmt.Errorf("conflict: %s already exists and points elsewhere. use --force to overwrite", linkPath)
+				}
+				if err := os.Remove(linkPath); err != nil {
+					return err
+				}
+			}
+
+			if err := os.Symlink(skillPath, linkPath); err != nil {
+				return fmt.Errorf("failed to create symlink %s: %w", linkPath, err)
+			}
+		}
+
+		// Clean up orphans
+		for orphan := range currentFiles {
+			orphanPath := filepath.Join(skillsDir, orphan)
+			info, err := os.Lstat(orphanPath)
+			if err != nil {
+				continue
+			}
+			// Only remove if it's a symlink pointing into our skill library (to be safe)
+			// Actually, if it's in our managed skillsDir, we should probably just remove it if it's not in the list.
+			// But the requirement just says "刪除組, 將組中的 skill 移除專案".
+			// Let's only remove symlinks.
+			if info.Mode()&os.ModeSymlink != 0 {
+				os.Remove(orphanPath)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (m *Manager) saveJSON(filename string, data any) error {
