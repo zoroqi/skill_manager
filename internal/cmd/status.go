@@ -40,7 +40,7 @@ var statusCmd = &cobra.Command{
 
 		var ctxCfg config.ContextConfig
 		if statusGlobal {
-			ctxCfg, err = manager.LoadContextConfig("global_context.json")
+			ctxCfg, err = manager.LoadContextConfig(config.FILENAME_GLOBAL_CONTEXT)
 			if err != nil {
 				return fmt.Errorf("failed to load global context: %w", err)
 			}

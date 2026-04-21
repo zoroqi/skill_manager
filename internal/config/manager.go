@@ -37,20 +37,20 @@ func (m *Manager) Init() error {
 	}
 
 	// Initialize Base Config
-	if err := m.SaveBaseConfig(BaseConfig{Version: "1.0", Skills: []Skill{}}); err != nil {
+	if err := m.SaveBaseConfig(BaseConfig{Version: CONFIG_VERSION, Skills: []Skill{}}); err != nil {
 		return err
 	}
 
 	// Initialize Groups Config
-	if err := m.SaveGroupsConfig(GroupsConfig{Version: "1.0", Groups: []Group{}}); err != nil {
+	if err := m.SaveGroupsConfig(GroupsConfig{Version: CONFIG_VERSION, Groups: []Group{}}); err != nil {
 		return err
 	}
 
 	// Initialize Summary Config with global context
-	summary := SummaryConfig{Version: "1.0", Contexts: []ContextSummary{
+	summary := SummaryConfig{Version: CONFIG_VERSION, Contexts: []ContextSummary{
 		{
 			Dir:         "global",
-			ConfigPath:  filepath.Join(m.configDir, "global_context.json"),
+			ConfigPath:  filepath.Join(m.configDir, FILENAME_GLOBAL_CONTEXT),
 			LastUpdated: "", // Can be filled with current time
 		},
 	}}
@@ -60,14 +60,14 @@ func (m *Manager) Init() error {
 
 	// Initialize Global Context Config
 	globalContext := ContextConfig{
-		Version:        "1.0",
+		Version:        CONFIG_VERSION,
 		Scope:          "global",
 		TargetDir:      m.configDir,
 		ActiveSkills:   []SkillUsage{},
 		InactiveSkills: []SkillUsage{},
 		ActiveGroups:   []string{},
 	}
-	if err := m.SaveContextConfig(globalContext, "global_context.json"); err != nil {
+	if err := m.SaveContextConfig(globalContext, FILENAME_GLOBAL_CONTEXT); err != nil {
 		return err
 	}
 
@@ -75,40 +75,40 @@ func (m *Manager) Init() error {
 }
 
 func (m *Manager) SaveBaseConfig(cfg BaseConfig) error {
-	return m.saveJSON("skills.json", cfg)
+	return m.saveJSON(FILENAME_SKILLS, cfg)
 }
 
 func (m *Manager) LoadBaseConfig() (BaseConfig, error) {
 	var cfg BaseConfig
-	err := m.loadJSON("skills.json", &cfg)
+	err := m.loadJSON(FILENAME_SKILLS, &cfg)
 	if err != nil && os.IsNotExist(err) {
-		return BaseConfig{Version: "1.0", Skills: []Skill{}}, nil
+		return BaseConfig{Version: CONFIG_VERSION, Skills: []Skill{}}, nil
 	}
 	return cfg, err
 }
 
 func (m *Manager) SaveGroupsConfig(cfg GroupsConfig) error {
-	return m.saveJSON("groups.json", cfg)
+	return m.saveJSON(FILENAME_GROUPS, cfg)
 }
 
 func (m *Manager) LoadGroupsConfig() (GroupsConfig, error) {
 	var cfg GroupsConfig
-	err := m.loadJSON("groups.json", &cfg)
+	err := m.loadJSON(FILENAME_GROUPS, &cfg)
 	if err != nil && os.IsNotExist(err) {
-		return GroupsConfig{Version: "1.0", Groups: []Group{}}, nil
+		return GroupsConfig{Version: CONFIG_VERSION, Groups: []Group{}}, nil
 	}
 	return cfg, err
 }
 
 func (m *Manager) SaveSummaryConfig(cfg SummaryConfig) error {
-	return m.saveJSON("summary.json", cfg)
+	return m.saveJSON(FILENAME_SUMMARY, cfg)
 }
 
 func (m *Manager) LoadSummaryConfig() (SummaryConfig, error) {
 	var cfg SummaryConfig
-	err := m.loadJSON("summary.json", &cfg)
+	err := m.loadJSON(FILENAME_SUMMARY, &cfg)
 	if err != nil && os.IsNotExist(err) {
-		return SummaryConfig{Version: "1.0", Contexts: []ContextSummary{}}, nil
+		return SummaryConfig{Version: CONFIG_VERSION, Contexts: []ContextSummary{}}, nil
 	}
 	return cfg, err
 }
@@ -279,8 +279,17 @@ func (m *Manager) SyncContext(targetDir string, ctxCfg *ContextConfig, force boo
 		}
 	}
 
-	// Apply symlinks for all agents in the project
+	// Calculate all agents that need to be processed
+	allAgents := make(map[string]bool)
 	for _, agent := range existingAgents {
+		allAgents[agent] = true
+	}
+	for agent := range agentToSkills {
+		allAgents[agent] = true
+	}
+
+	// Apply symlinks for all agents
+	for agent := range allAgents {
 		skills := agentToSkills[agent]
 		if skills == nil {
 			skills = make(map[string]string)
@@ -407,13 +416,13 @@ func (m *Manager) AddSkillToContext(cfg *ContextConfig, skillID string, agents [
 
 // EnsureLocalContext ensures a local context exists or creates a new one.
 func EnsureLocalContext(targetDir string) (ContextConfig, error) {
-	path := filepath.Join(targetDir, ".context.json")
+	path := filepath.Join(targetDir, FILENAME_CONTEXT)
 	var cfg ContextConfig
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return ContextConfig{
-				Version:        "1.0",
+				Version:        CONFIG_VERSION,
 				Scope:          "project",
 				TargetDir:      targetDir,
 				ActiveSkills:   []SkillUsage{},
@@ -429,7 +438,7 @@ func EnsureLocalContext(targetDir string) (ContextConfig, error) {
 
 // SaveLocalContext saves the local context config.
 func SaveLocalContext(targetDir string, cfg ContextConfig) error {
-	path := filepath.Join(targetDir, ".context.json")
+	path := filepath.Join(targetDir, FILENAME_CONTEXT)
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err

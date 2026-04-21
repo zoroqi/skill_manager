@@ -59,7 +59,7 @@ var groupDeleteCmd = &cobra.Command{
 }
 
 var groupAddSkillCmd = &cobra.Command{
-	Use:   "add-skill <group_name> <skill_name>...",
+	Use:   "add <group_name> <skill_name>...",
 	Short: "Add one or more skills to a group",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -98,7 +98,7 @@ var groupAddSkillCmd = &cobra.Command{
 }
 
 var groupRemoveSkillCmd = &cobra.Command{
-	Use:   "remove-skill <group_name> <skill_name>...",
+	Use:   "remove <group_name> <skill_name>...",
 	Short: "Remove one or more skills from a group",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -67,7 +67,7 @@ func TestSyncContext(t *testing.T) {
 	os.WriteFile(skill2Path, []byte("skill2"), 0644)
 
 	baseCfg := BaseConfig{
-		Version: "1.0",
+		Version: CONFIG_VERSION,
 		Skills: []Skill{
 			{ID: "s1", Name: "skill-1", Path: skill1Path},
 			{ID: "s2", Name: "skill-2", Path: skill2Path},

@@ -20,7 +20,7 @@ func TestConfigJSONFormat(t *testing.T) {
 		},
 	}
 	baseConfig := BaseConfig{
-		Version: "1.0",
+		Version: CONFIG_VERSION,
 		Skills:  []Skill{skill},
 	}
 	data, err := json.Marshal(baseConfig)
@@ -35,7 +35,7 @@ func TestConfigJSONFormat(t *testing.T) {
 		SkillIDs:    []string{"e4d909c290d0fb1ca068ffaddf22cbd0"},
 	}
 	groupsConfig := GroupsConfig{
-		Version: "1.0",
+		Version: CONFIG_VERSION,
 		Groups:  []Group{group},
 	}
 	data, err = json.Marshal(groupsConfig)
@@ -44,7 +44,7 @@ func TestConfigJSONFormat(t *testing.T) {
 
 	// 3. Context Config
 	contextConfig := ContextConfig{
-		Version:   "1.0",
+		Version:   CONFIG_VERSION,
 		Scope:     "project",
 		TargetDir: "/project/dir",
 		ActiveSkills: []SkillUsage{
@@ -58,7 +58,7 @@ func TestConfigJSONFormat(t *testing.T) {
 
 	// 4. Summary Config
 	summaryConfig := SummaryConfig{
-		Version: "1.0",
+		Version: CONFIG_VERSION,
 		Contexts: []ContextSummary{
 			{Dir: "/project/dir", ConfigPath: "/project/dir/.skill_manager.json", LastUpdated: "2026-04-16T10:00:00Z"},
 		},

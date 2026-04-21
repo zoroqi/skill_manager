@@ -59,12 +59,12 @@ var stopCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			ctxCfg, err = manager.LoadContextConfig("global_context.json")
+			ctxCfg, err = manager.LoadContextConfig(config.FILENAME_GLOBAL_CONTEXT)
 			if err != nil {
 				return fmt.Errorf("failed to load global context: %w", err)
 			}
 			saveCtx = func() error {
-				return manager.SaveContextConfig(ctxCfg, "global_context.json")
+				return manager.SaveContextConfig(ctxCfg, config.FILENAME_GLOBAL_CONTEXT)
 			}
 		} else {
 			ctxCfg, err = config.EnsureLocalContext(targetDir)

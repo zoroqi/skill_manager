@@ -28,7 +28,7 @@ func TestAddCommandLocalContext(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = manager.SaveBaseConfig(config.BaseConfig{
-		Version: "1.0",
+		Version: config.CONFIG_VERSION,
 		Skills: []config.Skill{
 			{ID: "mock-id", Name: "mock_skill", Path: skillPath},
 		},
@@ -58,7 +58,7 @@ func TestAddCommandLocalContext(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify local context is created
-	ctxData, err := os.ReadFile(filepath.Join(projectDir, ".context.json"))
+	ctxData, err := os.ReadFile(filepath.Join(projectDir, config.FILENAME_CONTEXT))
 	assert.NoError(t, err)
 	assert.Contains(t, string(ctxData), "mock-id")
 

@@ -13,12 +13,12 @@ func TestSaveAndLoadBaseConfig(t *testing.T) {
 	err := manager.Init()
 	assert.NoError(t, err)
 
-	filePath := filepath.Join(tempDir, "skills.json")
+	filePath := filepath.Join(tempDir, FILENAME_SKILLS)
 	assert.FileExists(t, filePath)
 
 	cfg, err := manager.LoadBaseConfig()
 	assert.NoError(t, err)
-	assert.Equal(t, "1.0", cfg.Version)
+	assert.Equal(t, CONFIG_VERSION, cfg.Version)
 	assert.Empty(t, cfg.Skills)
 
 	cfg.Skills = append(cfg.Skills, Skill{ID: "123", Name: "test"})

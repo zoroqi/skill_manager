@@ -12,12 +12,12 @@ import (
 
 func TestRemoveStopStatus(t *testing.T) {
 	tempDir := t.TempDir()
-	
+
 	// Setup config dir
 	configDir := filepath.Join(tempDir, ".skill_manager")
 	os.Setenv("SKILL_MANAGER_CONFIG", configDir)
 	defer os.Unsetenv("SKILL_MANAGER_CONFIG")
-	
+
 	manager := config.NewManager(configDir)
 	err := manager.Init()
 	assert.NoError(t, err)
@@ -28,7 +28,7 @@ func TestRemoveStopStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = manager.SaveBaseConfig(config.BaseConfig{
-		Version: "1.0",
+		Version: config.CONFIG_VERSION,
 		Skills: []config.Skill{
 			{ID: "skill-1", Name: "my_skill", Path: skillPath},
 		},
@@ -39,7 +39,7 @@ func TestRemoveStopStatus(t *testing.T) {
 	projectDir := filepath.Join(tempDir, "project")
 	err = os.MkdirAll(projectDir, 0755)
 	assert.NoError(t, err)
-	
+
 	oldWd, _ := os.Getwd()
 	os.Chdir(projectDir)
 	defer os.Chdir(oldWd)

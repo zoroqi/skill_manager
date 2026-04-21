@@ -1,6 +1,15 @@
 // internal/config/config.go
 package config
 
+const (
+	CONFIG_VERSION          = "1.0"
+	FILENAME_SKILLS         = "skills.json"
+	FILENAME_GROUPS         = "groups.json"
+	FILENAME_SUMMARY        = "summary.json"
+	FILENAME_CONTEXT        = ".context.json"
+	FILENAME_GLOBAL_CONTEXT = "global_context.json"
+)
+
 type Skill struct {
 	ID          string         `json:"id" yaml:"-"`
 	Name        string         `json:"name" yaml:"name"`

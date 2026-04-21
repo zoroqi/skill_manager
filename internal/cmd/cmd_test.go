@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/zoroqi/skill_manager/internal/config"
 )
 
 func TestCommands(t *testing.T) {
@@ -19,7 +21,7 @@ func TestCommands(t *testing.T) {
 	err := rootCmd.Execute()
 	assert.NoError(t, err)
 	assert.DirExists(t, tempConfig)
-	assert.FileExists(t, filepath.Join(tempConfig, "skills.json"))
+	assert.FileExists(t, filepath.Join(tempConfig, config.FILENAME_SKILLS))
 
 	// 2. Test scan
 	mockDir := t.TempDir()
