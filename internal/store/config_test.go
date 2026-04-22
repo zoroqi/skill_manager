@@ -1,15 +1,14 @@
-// internal/config/config_test.go
-package config
+package store
 
 import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
+	"github.com/zoroqi/skill_manager/internal"
 	"testing"
 )
 
 func TestConfigJSONFormat(t *testing.T) {
-	// 1. Base Skills Config
-	skill := Skill{
+	skill := internal.Skill{
 		ID:          "e4d909c290d0fb1ca068ffaddf22cbd0",
 		Name:        "golang-pro",
 		Path:        "/some/path",
@@ -19,35 +18,33 @@ func TestConfigJSONFormat(t *testing.T) {
 			"allowed-tools": []string{"Read", "Write"},
 		},
 	}
-	baseConfig := BaseConfig{
-		Version: CONFIG_VERSION,
-		Skills:  []Skill{skill},
+	baseConfig := internal.BaseConfig{
+		Version: internal.CONFIG_VERSION,
+		Skills:  []internal.Skill{skill},
 	}
 	data, err := json.Marshal(baseConfig)
 	assert.NoError(t, err)
 	assert.Contains(t, string(data), `"skills":[{`)
 
-	// 2. Groups Config
-	group := Group{
+	group := internal.Group{
 		ID:          "g1",
 		Name:        "group1",
 		Description: "desc",
 		SkillIDs:    []string{"e4d909c290d0fb1ca068ffaddf22cbd0"},
 	}
-	groupsConfig := GroupsConfig{
-		Version: CONFIG_VERSION,
-		Groups:  []Group{group},
+	groupsConfig := internal.GroupsConfig{
+		Version: internal.CONFIG_VERSION,
+		Groups:  []internal.Group{group},
 	}
 	data, err = json.Marshal(groupsConfig)
 	assert.NoError(t, err)
 	assert.Contains(t, string(data), `"groups":[{`)
 
-	// 3. Context Config
-	contextConfig := ContextConfig{
-		Version:   CONFIG_VERSION,
+	contextConfig := internal.ContextConfig{
+		Version:   internal.CONFIG_VERSION,
 		Scope:     "project",
 		TargetDir: "/project/dir",
-		ActiveSkills: []SkillUsage{
+		ActiveSkills: []internal.SkillUsage{
 			{ID: "e4d909c290d0fb1ca068ffaddf22cbd0", Agents: []string{"gemini"}},
 		},
 		ActiveGroups: []string{"g1"},
@@ -56,10 +53,9 @@ func TestConfigJSONFormat(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(data), `"scope":"project"`)
 
-	// 4. Summary Config
-	summaryConfig := SummaryConfig{
-		Version: CONFIG_VERSION,
-		Contexts: []ContextSummary{
+	summaryConfig := internal.SummaryConfig{
+		Version: internal.CONFIG_VERSION,
+		Contexts: []internal.ContextSummary{
 			{Dir: "/project/dir", ConfigPath: "/project/dir/.skill_manager.json", LastUpdated: "2026-04-16T10:00:00Z"},
 		},
 	}

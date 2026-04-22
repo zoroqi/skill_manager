@@ -1,5 +1,5 @@
-// internal/config/config.go
-package config
+// internal/types.go
+package internal
 
 const (
 	CONFIG_VERSION          = "1.0"

@@ -1,7 +1,8 @@
-package config
+package store
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/zoroqi/skill_manager/internal"
 	"path/filepath"
 	"testing"
 )
@@ -13,15 +14,15 @@ func TestSaveAndLoadBaseConfig(t *testing.T) {
 	err := manager.Init()
 	assert.NoError(t, err)
 
-	filePath := filepath.Join(tempDir, FILENAME_SKILLS)
+	filePath := filepath.Join(tempDir, internal.FILENAME_SKILLS)
 	assert.FileExists(t, filePath)
 
 	cfg, err := manager.LoadBaseConfig()
 	assert.NoError(t, err)
-	assert.Equal(t, CONFIG_VERSION, cfg.Version)
+	assert.Equal(t, internal.CONFIG_VERSION, cfg.Version)
 	assert.Empty(t, cfg.Skills)
 
-	cfg.Skills = append(cfg.Skills, Skill{ID: "123", Name: "test"})
+	cfg.Skills = append(cfg.Skills, internal.Skill{ID: "123", Name: "test"})
 	err = manager.SaveBaseConfig(cfg)
 	assert.NoError(t, err)
 

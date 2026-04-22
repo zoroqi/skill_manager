@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zoroqi/skill_manager/internal/config"
+	"github.com/zoroqi/skill_manager/internal"
 	"gopkg.in/yaml.v3"
 )
 
@@ -18,8 +18,8 @@ func generateID(parentDir, skillName string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func parseSkillMd(path string) (config.Skill, error) {
-	var s config.Skill
+func parseSkillMd(path string) (internal.Skill, error) {
+	var s internal.Skill
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return s, err
@@ -44,8 +44,8 @@ func parseSkillMd(path string) (config.Skill, error) {
 }
 
 // Scan traverses subdirectories of rootDir, checks for SKILL.md, and returns discovered skills.
-func Scan(rootDir string) ([]config.Skill, error) {
-	var skills []config.Skill
+func Scan(rootDir string) ([]internal.Skill, error) {
+	var skills []internal.Skill
 	absRoot, err := filepath.Abs(rootDir)
 	if err != nil {
 		return nil, err

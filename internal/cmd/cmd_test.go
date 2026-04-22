@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/zoroqi/skill_manager/internal/config"
+	"github.com/zoroqi/skill_manager/internal"
 )
 
 func TestCommands(t *testing.T) {
@@ -21,7 +21,7 @@ func TestCommands(t *testing.T) {
 	err := rootCmd.Execute()
 	assert.NoError(t, err)
 	assert.DirExists(t, tempConfig)
-	assert.FileExists(t, filepath.Join(tempConfig, config.FILENAME_SKILLS))
+	assert.FileExists(t, filepath.Join(tempConfig, internal.FILENAME_SKILLS))
 
 	// 2. Test scan
 	mockDir := t.TempDir()

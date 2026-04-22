@@ -7,7 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/zoroqi/skill_manager/internal/config"
+	"github.com/zoroqi/skill_manager/internal"
+	"github.com/zoroqi/skill_manager/internal/store"
 )
 
 func TestRemoveStopStatus(t *testing.T) {
@@ -18,7 +19,7 @@ func TestRemoveStopStatus(t *testing.T) {
 	os.Setenv("SKILL_MANAGER_CONFIG", configDir)
 	defer os.Unsetenv("SKILL_MANAGER_CONFIG")
 
-	manager := config.NewManager(configDir)
+	manager := store.NewManager(configDir)
 	err := manager.Init()
 	assert.NoError(t, err)
 
@@ -27,9 +28,9 @@ func TestRemoveStopStatus(t *testing.T) {
 	err = os.MkdirAll(skillPath, 0755)
 	assert.NoError(t, err)
 
-	err = manager.SaveBaseConfig(config.BaseConfig{
-		Version: config.CONFIG_VERSION,
-		Skills: []config.Skill{
+	err = manager.SaveBaseConfig(internal.BaseConfig{
+		Version: internal.CONFIG_VERSION,
+		Skills: []internal.Skill{
 			{ID: "skill-1", Name: "my_skill", Path: skillPath},
 		},
 	})
@@ -69,7 +70,7 @@ func TestRemoveStopStatus(t *testing.T) {
 	err = rootCmd.Execute()
 	assert.NoError(t, err)
 
-	ctxCfg, err := config.EnsureLocalContext(projectDir)
+	ctxCfg, err := store.EnsureLocalContext(projectDir)
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"gemini", "claude"}, ctxCfg.ActiveSkills[0].Agents)
 
@@ -90,7 +91,7 @@ func TestRemoveStopStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify skill remains ACTIVE with only claude
-	ctxCfg, err = config.EnsureLocalContext(projectDir)
+	ctxCfg, err = store.EnsureLocalContext(projectDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(ctxCfg.ActiveSkills))
 	assert.Equal(t, []string{"claude"}, ctxCfg.ActiveSkills[0].Agents)
@@ -107,7 +108,7 @@ func TestRemoveStopStatus(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, os.IsNotExist(err))
 
-	ctxCfg, err = config.EnsureLocalContext(projectDir)
+	ctxCfg, err = store.EnsureLocalContext(projectDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(ctxCfg.ActiveSkills))
 	assert.Equal(t, 1, len(ctxCfg.InactiveSkills))
@@ -119,7 +120,7 @@ func TestRemoveStopStatus(t *testing.T) {
 	err = rootCmd.Execute()
 	assert.NoError(t, err)
 
-	ctxCfg, err = config.EnsureLocalContext(projectDir)
+	ctxCfg, err = store.EnsureLocalContext(projectDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(ctxCfg.ActiveSkills))
 	assert.Equal(t, 0, len(ctxCfg.InactiveSkills))
@@ -139,7 +140,7 @@ func TestRemoveStopStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify context cleared
-	ctxCfg, err = config.EnsureLocalContext(projectDir)
+	ctxCfg, err = store.EnsureLocalContext(projectDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(ctxCfg.ActiveSkills))
 	assert.Equal(t, 0, len(ctxCfg.InactiveSkills))

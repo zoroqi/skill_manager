@@ -7,7 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/zoroqi/skill_manager/internal/config"
+	"github.com/zoroqi/skill_manager/internal"
+	"github.com/zoroqi/skill_manager/internal/store"
 )
 
 func TestAddCommandLocalContext(t *testing.T) {
@@ -18,7 +19,7 @@ func TestAddCommandLocalContext(t *testing.T) {
 	os.Setenv("SKILL_MANAGER_CONFIG", configDir)
 	defer os.Unsetenv("SKILL_MANAGER_CONFIG")
 
-	manager := config.NewManager(configDir)
+	manager := store.NewManager(configDir)
 	err := manager.Init()
 	assert.NoError(t, err)
 
@@ -27,9 +28,9 @@ func TestAddCommandLocalContext(t *testing.T) {
 	err = os.MkdirAll(skillPath, 0755)
 	assert.NoError(t, err)
 
-	err = manager.SaveBaseConfig(config.BaseConfig{
-		Version: config.CONFIG_VERSION,
-		Skills: []config.Skill{
+	err = manager.SaveBaseConfig(internal.BaseConfig{
+		Version: internal.CONFIG_VERSION,
+		Skills: []internal.Skill{
 			{ID: "mock-id", Name: "mock_skill", Path: skillPath},
 		},
 	})
@@ -58,7 +59,7 @@ func TestAddCommandLocalContext(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify local context is created
-	ctxData, err := os.ReadFile(filepath.Join(projectDir, config.FILENAME_CONTEXT))
+	ctxData, err := os.ReadFile(filepath.Join(projectDir, internal.FILENAME_CONTEXT))
 	assert.NoError(t, err)
 	assert.Contains(t, string(ctxData), "mock-id")
 

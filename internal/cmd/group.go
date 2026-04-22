@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/zoroqi/skill_manager/internal/config"
 )
 
 var groupCmd = &cobra.Command{
@@ -23,14 +22,7 @@ var groupCreateCmd = &cobra.Command{
 		if len(args) > 1 {
 			description = strings.Join(args[1:], " ")
 		}
-
-		configDir, err := config.GetDefaultConfigDir()
-		if err != nil {
-			return err
-		}
-		manager := config.NewManager(configDir)
-
-		if err := manager.CreateGroup(name, description); err != nil {
+		if err := application.CreateGroup(name, description); err != nil {
 			return err
 		}
 		fmt.Printf("Group '%s' created successfully.\n", name)
@@ -43,17 +35,10 @@ var groupDeleteCmd = &cobra.Command{
 	Short: "Delete a group",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-		configDir, err := config.GetDefaultConfigDir()
-		if err != nil {
+		if err := application.DeleteGroup(args[0]); err != nil {
 			return err
 		}
-		manager := config.NewManager(configDir)
-
-		if err := manager.DeleteGroup(name); err != nil {
-			return err
-		}
-		fmt.Printf("Group '%s' deleted successfully.\n", name)
+		fmt.Printf("Group '%s' deleted successfully.\n", args[0])
 		return nil
 	},
 }
@@ -65,32 +50,10 @@ var groupAddSkillCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		groupName := args[0]
 		skillNames := args[1:]
-
-		configDir, err := config.GetDefaultConfigDir()
-		if err != nil {
+		if err := application.AddSkillToGroup(groupName, skillNames); err != nil {
 			return err
 		}
-		manager := config.NewManager(configDir)
-
-		baseCfg, err := manager.LoadBaseConfig()
-		if err != nil {
-			return err
-		}
-
 		for _, sn := range skillNames {
-			var skillID string
-			for _, s := range baseCfg.Skills {
-				if s.Name == sn {
-					skillID = s.ID
-					break
-				}
-			}
-			if skillID == "" {
-				return fmt.Errorf("skill '%s' not found", sn)
-			}
-			if err := manager.AddSkillToGroup(groupName, skillID); err != nil {
-				return err
-			}
 			fmt.Printf("Skill '%s' added to group '%s'.\n", sn, groupName)
 		}
 		return nil
@@ -104,32 +67,10 @@ var groupRemoveSkillCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		groupName := args[0]
 		skillNames := args[1:]
-
-		configDir, err := config.GetDefaultConfigDir()
-		if err != nil {
+		if err := application.RemoveSkillFromGroup(groupName, skillNames); err != nil {
 			return err
 		}
-		manager := config.NewManager(configDir)
-
-		baseCfg, err := manager.LoadBaseConfig()
-		if err != nil {
-			return err
-		}
-
 		for _, sn := range skillNames {
-			var skillID string
-			for _, s := range baseCfg.Skills {
-				if s.Name == sn {
-					skillID = s.ID
-					break
-				}
-			}
-			if skillID == "" {
-				return fmt.Errorf("skill '%s' not found in base config, skipping", sn)
-			}
-			if err := manager.RemoveSkillFromGroup(groupName, skillID); err != nil {
-				return err
-			}
 			fmt.Printf("Skill '%s' removed from group '%s'.\n", sn, groupName)
 		}
 		return nil
@@ -140,23 +81,17 @@ var groupListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all groups and their skills",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		configDir, err := config.GetDefaultConfigDir()
+		groupsCfg, err := application.ListGroups()
 		if err != nil {
 			return err
 		}
-		manager := config.NewManager(configDir)
-
-		groupsCfg, err := manager.LoadGroupsConfig()
-		if err != nil {
-			return err
-		}
-		baseCfg, err := manager.LoadBaseConfig()
+		skills, err := application.ListSkills()
 		if err != nil {
 			return err
 		}
 
 		skillMap := make(map[string]string)
-		for _, s := range baseCfg.Skills {
+		for _, s := range skills {
 			skillMap[s.ID] = s.Name
 		}
 
