@@ -50,6 +50,11 @@ func (m *Manager) Init() error {
 		return err
 	}
 
+	// Initialize Registries Config
+	if err := m.SaveRegistriesConfig(internal.RegistriesConfig{Version: internal.CONFIG_VERSION, Registries: []internal.Registry{}}); err != nil {
+		return err
+	}
+
 	// Initialize Summary Config with global context
 	summary := internal.SummaryConfig{Version: internal.CONFIG_VERSION, Contexts: []internal.ContextSummary{
 		{
@@ -103,6 +108,22 @@ func (m *Manager) LoadGroupsConfig() (internal.GroupsConfig, error) {
 	err := m.loadJSON(internal.FILENAME_GROUPS, &cfg)
 	if err != nil && os.IsNotExist(err) {
 		return internal.GroupsConfig{Version: internal.CONFIG_VERSION, Groups: []internal.Group{}}, nil
+	}
+	return cfg, err
+}
+
+func (m *Manager) SaveRegistriesConfig(cfg internal.RegistriesConfig) error {
+	sort.Slice(cfg.Registries, func(i, j int) bool {
+		return cfg.Registries[i].Name < cfg.Registries[j].Name
+	})
+	return m.saveJSON(internal.FILENAME_REGISTRIES, cfg)
+}
+
+func (m *Manager) LoadRegistriesConfig() (internal.RegistriesConfig, error) {
+	var cfg internal.RegistriesConfig
+	err := m.loadJSON(internal.FILENAME_REGISTRIES, &cfg)
+	if err != nil && os.IsNotExist(err) {
+		return internal.RegistriesConfig{Version: internal.CONFIG_VERSION, Registries: []internal.Registry{}}, nil
 	}
 	return cfg, err
 }

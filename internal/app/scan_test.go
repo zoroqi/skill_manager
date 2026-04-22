@@ -16,7 +16,7 @@ func TestScanSkills(t *testing.T) {
 	os.MkdirAll(skillSubDir, 0755)
 	os.WriteFile(filepath.Join(skillSubDir, "SKILL.md"), []byte("# my-skill\nA test skill"), 0644)
 
-	count, err := app.ScanSkills(skillDir)
+	count, err := app.ScanSkills(skillDir, "")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
@@ -27,6 +27,6 @@ func TestScanSkills(t *testing.T) {
 
 func TestScanSkillsInvalidDir(t *testing.T) {
 	app, _ := setupApp(t)
-	_, err := app.ScanSkills("/nonexistent/path/xyz")
+	_, err := app.ScanSkills("/nonexistent/path/xyz", "")
 	assert.Error(t, err)
 }

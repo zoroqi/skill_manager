@@ -13,8 +13,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func generateID(parentDir, skillName string) string {
-	hash := md5.Sum(fmt.Appendf(nil, "%s/%s", parentDir, skillName))
+func generateID(registryOrParentDir, skillName string) string {
+	hash := md5.Sum(fmt.Appendf(nil, "%s_%s", registryOrParentDir, skillName))
 	return hex.EncodeToString(hash[:])
 }
 
@@ -44,40 +44,56 @@ func parseSkillMd(path string) (internal.Skill, error) {
 }
 
 // Scan traverses subdirectories of rootDir, checks for SKILL.md, and returns discovered skills.
-func Scan(rootDir string) ([]internal.Skill, error) {
+func Scan(rootDir string, registryName string) ([]internal.Skill, error) {
 	var skills []internal.Skill
 	absRoot, err := filepath.Abs(rootDir)
 	if err != nil {
 		return nil, err
 	}
 
-	entries, err := os.ReadDir(absRoot)
+	err = filepath.WalkDir(absRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip hidden directories (starting with .)
+		if d.IsDir() && strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir
+		}
+
+		if !d.IsDir() && d.Name() == "SKILL.md" {
+			skillPath := filepath.Dir(path)
+			s, err := parseSkillMd(path)
+			if err != nil {
+				// Log error and skip
+				return nil
+			}
+
+			// Override or ensure essential fields
+			skillDirName := filepath.Base(skillPath)
+			if s.Name == "" {
+				s.Name = skillDirName
+			}
+			s.Path = skillPath
+			s.RegistryName = registryName
+
+			idKey := registryName
+			if idKey == "" {
+				idKey = filepath.Base(filepath.Dir(skillPath))
+			}
+			s.ID = generateID(idKey, s.Name)
+
+			skills = append(skills, s)
+
+			// Once a SKILL.md is found, don't scan deeper into this directory
+			return filepath.SkipDir
+		}
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	for _, entry := range entries {
-		if entry.IsDir() {
-			skillPath := filepath.Join(absRoot, entry.Name())
-			skillMdPath := filepath.Join(skillPath, "SKILL.md")
-			if _, err := os.Stat(skillMdPath); err == nil {
-				s, err := parseSkillMd(skillMdPath)
-				if err != nil {
-					// Log error and skip or continue
-					continue
-				}
-
-				// Override or ensure essential fields
-				if s.Name == "" {
-					s.Name = entry.Name()
-				}
-				s.Path = skillPath
-				parentDir := filepath.Base(filepath.Dir(skillPath))
-				s.ID = generateID(parentDir, entry.Name())
-
-				skills = append(skills, s)
-			}
-		}
-	}
 	return skills, nil
 }

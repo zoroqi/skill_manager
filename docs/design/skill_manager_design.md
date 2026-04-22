@@ -7,10 +7,11 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 
 ### 2.1 技能庫 (skills.json)
 儲存所有已掃描並受管理的技能。
-- **ID:** 使用 `md5(parent_dir/skill_name)` 以確保唯一性。
+- **ID:** 使用 `md5(registry_name_or_parent_dir_skill_name)` 以確保唯一性。
 - **核心字段:**
   - `id`: 唯一識別碼。
   - `name`: 技能名稱（通常為目錄名，亦可由 YAML 指定）。
+  - `registry_name`: 所屬註冊專案名稱（若為本地掃描則為空）。
   - `path`: 技能目錄的絕對路徑。
   - `description`: 技能描述。
   - `metadata`: `map[string]any`，用於存儲從 `SKILL.md` 中解析出的 YAML 前言資訊。
@@ -24,7 +25,15 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
   - `description`: 分組描述。
   - `skill_ids`: 字串列表，記錄該分組包含的所有技能 ID。
 
-### 2.3 上下文配置 (.context.json / global_context.json)
+### 2.3 遠端倉庫註冊 (registries.json)
+記錄透過 `register` 功能從開源平臺下載的技能專案。
+- **核心字段:**
+  - `name`: 註冊名稱，採用 `<org>_<repo>` 格式以避免命名衝突。
+  - `url`: 原始 Git URL (支援 HTTPS/SSH)。
+  - `local_path`: 下載後的本地絕對路徑。
+  - `last_updated`: 最後一次 `update` 的時間。
+
+### 2.4 上下文配置 (.context.json / global_context.json)
 記錄當前專案或全局環境下的技能使用狀態。
 - **技能使用狀況 (SkillUsage):**
   - `id`: 技能 ID。
@@ -38,7 +47,10 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 ## 3. 功能邏輯
 
 ### 3.1 技能掃描 (Scanner)
-...
+遍歷目標目錄及其子目錄，尋找包含 `SKILL.md` 的資料夾。
+- **遞歸掃描:** 使用 `filepath.WalkDir` 支援發現深層結構（如 `skills/` 子目錄）中的技能。
+- **安全過濾:** 自動跳過隱藏目錄（如 `.git/`, `.github/`）。
+- **原子性發現:** 一旦在某個目錄發現 `SKILL.md`，即將該目錄視為一個技能單元，停止向該目錄深層繼續掃描，避免重複識別。
 
 ### 3.2 技能生命週期管理
 - **Add:**
@@ -59,8 +71,13 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
   - **衝突處理:** 若目標位置已存在非對應的檔案或連結，且未提供 `--force` 參數，則中止操作並提示衝突。
 - **Status:**
   - 展示當前上下文的所有活性技能、啟用的分組及停用技能。
+- **Register (Git-centric):**
+  - **Add:** 執行 `git clone`，將倉庫存放到預設路徑（環境變數或 `registries/` 目錄），並自動觸發 `scan`。
+  - **Update:** 針對註冊專案執行 `git pull` 並重新 `scan`。
+  - **Remove:** 支援 `--delete` 參數，將本地目錄移動至備份區，並清理 `skills.json` 中的無效路徑。
 
 ## 4. 命令結構 (CLI)
+- **register:** 管理遠端技能倉庫 (add, update, list, remove)。
 - **group:** 管理技能組（create, delete, add-skill, remove-skill, list）。
 - **add / remove:** 支援單體技能或使用 `--group` 標誌。
 - **sync:** 強制同步專案環境與配置狀態。

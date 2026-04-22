@@ -7,17 +7,27 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具，旨�
 本項目的核心目標包括：
 1.  **管理本地技能：** 提供一種在本地組織和維護技能的方式。
 2.  **統一全局配置：** 集中管理並變更 AI Agent 的全局技能配置。
-3.  **項目專屬配置：** 允許根據具體項目上下文進行單獨的技能設置或排除。
-4.  **快速初始化：** 能夠快速為新項目創建和初始化技能。
+    - **項目專屬配置：** 允許根據具體項目上下文進行單獨的技能設置或排除。
+    - **快速初始化：** 能夠快速為新項目創建和初始化技能。
+    - **遠端技能註冊 (Register)：** 透過 Git 原生支援，從開源平臺下載、追蹤並更新 SKILL 倉庫。
 
 ## 核心技術
 
 - **Go (1.26.0+):** 核心開發語言。
 - **Cobra:** 用於構建命令行界面 (CLI)。
 - **Testify:** 用於應用程序測試。
+- **Git:** 用於遠端技能的下載與更新管理。
+
+## 命令結構參考 (Quick Start)
+
+- `skill_manager register add <URL>`: 下載並註冊開源技能倉庫。
+- `skill_manager register update <NAME>`: 更新已註冊的遠端技能。
+- `skill_manager scan <DIR>`: 掃描本地目錄並納入管理。
+- `skill_manager add <SKILL_ID>`: 在當前專案中啟用技能。
+- `skill_manager sync`: 同步並建立軟鏈。
 
 ## 目錄結構
-
+...
 - `docs/target.md`: 初始需求構思與目標。
 - `docs/design/skill_manager_design.md`: 核心技術設計文檔。
 - `go.mod`: 項目依賴與模塊定義。

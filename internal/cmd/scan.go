@@ -11,7 +11,7 @@ var scanCmd = &cobra.Command{
 	Short: "Scan directory for skills and update config",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		count, err := application.ScanSkills(args[0])
+		count, err := application.ScanSkills(args[0], "")
 		if err != nil {
 			return err
 		}

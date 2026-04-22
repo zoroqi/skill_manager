@@ -5,8 +5,8 @@ import (
 	"github.com/zoroqi/skill_manager/internal/scanner"
 )
 
-func (a *App) ScanSkills(dir string) (int, error) {
-	skills, err := scanner.Scan(dir)
+func (a *App) ScanSkills(dir string, registryName string) (int, error) {
+	skills, err := scanner.Scan(dir, registryName)
 	if err != nil {
 		return 0, err
 	}
