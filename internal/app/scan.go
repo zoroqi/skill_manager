@@ -6,13 +6,14 @@ import (
 )
 
 func (a *App) ScanSkills(dir string, registryName string) (int, error) {
-	skills, err := scanner.Scan(dir, registryName)
+
+	cfg, err := a.store.LoadBaseConfig()
 	if err != nil {
 		return 0, err
 	}
 
-	cfg, err := a.store.LoadBaseConfig()
-	if err != nil {
+	skills, err := scanner.Scan(dir, registryName)
+	if err != nil || len(skills) == 0 {
 		return 0, err
 	}
 

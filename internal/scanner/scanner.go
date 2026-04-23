@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,6 +60,10 @@ func Scan(rootDir string, registryName string) ([]internal.Skill, error) {
 		// Skip hidden directories (starting with .)
 		if d.IsDir() && strings.HasPrefix(d.Name(), ".") {
 			return filepath.SkipDir
+		}
+
+		if d.Type()&fs.ModeSymlink != 0 {
+			return err
 		}
 
 		if !d.IsDir() && d.Name() == "SKILL.md" {

@@ -24,7 +24,7 @@ func NewManager(configDir string) *Manager {
 // It checks the SKILL_MANAGER_CONFIG environment variable first,
 // and defaults to ~/.skill_manager if not set.
 func GetDefaultConfigDir() (string, error) {
-	if dir := os.Getenv("SKILL_MANAGER_CONFIG"); dir != "" {
+	if dir := os.Getenv(internal.ENV_CONFIG_DIR); dir != "" {
 		return dir, nil
 	}
 
@@ -84,6 +84,27 @@ func (m *Manager) Init() error {
 }
 
 func (m *Manager) SaveBaseConfig(cfg internal.BaseConfig) error {
+	registries, err := m.LoadRegistriesConfig()
+	if err == nil {
+		regMap := make(map[string]internal.Registry)
+		for _, r := range registries.Registries {
+			regMap[r.Name] = r
+		}
+
+		for i, s := range cfg.Skills {
+			if s.RegistryName != "" {
+				if r, ok := regMap[s.RegistryName]; ok {
+					physicalPath, err := r.GetPhysicalPath()
+					if err == nil {
+						relPath, err := filepath.Rel(physicalPath, s.Path)
+						if err == nil {
+							cfg.Skills[i].Path = relPath
+						}
+					}
+				}
+			}
+		}
+	}
 	return m.saveJSON(internal.FILENAME_SKILLS, cfg)
 }
 
@@ -92,6 +113,26 @@ func (m *Manager) LoadBaseConfig() (internal.BaseConfig, error) {
 	err := m.loadJSON(internal.FILENAME_SKILLS, &cfg)
 	if err != nil && os.IsNotExist(err) {
 		return internal.BaseConfig{Version: internal.CONFIG_VERSION, Skills: []internal.Skill{}}, nil
+	}
+	if err == nil {
+		registries, err := m.LoadRegistriesConfig()
+		if err == nil {
+			regMap := make(map[string]internal.Registry)
+			for _, r := range registries.Registries {
+				regMap[r.Name] = r
+			}
+
+			for i, s := range cfg.Skills {
+				if s.RegistryName != "" {
+					if r, ok := regMap[s.RegistryName]; ok {
+						physicalPath, err := r.GetPhysicalPath()
+						if err == nil {
+							cfg.Skills[i].Path = filepath.Join(physicalPath, s.Path)
+						}
+					}
+				}
+			}
+		}
 	}
 	return cfg, err
 }

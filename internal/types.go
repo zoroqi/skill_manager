@@ -1,6 +1,12 @@
 // internal/types.go
 package internal
 
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
+
 const (
 	CONFIG_VERSION          = "1.0"
 	FILENAME_SKILLS         = "skills.json"
@@ -9,6 +15,9 @@ const (
 	FILENAME_REGISTRIES     = "registries.json"
 	FILENAME_CONTEXT        = ".context.json"
 	FILENAME_GLOBAL_CONTEXT = "global_context.json"
+
+	ENV_CONFIG_DIR    = "SKILL_MANAGER_CONFIG"
+	ENV_REGISTER_PATH = "SKILL_MANAGER_REGISTER_PATH"
 )
 
 type Registry struct {
@@ -16,6 +25,29 @@ type Registry struct {
 	URL         string `json:"url"`          // 遠端 Git URL
 	LocalPath   string `json:"local_path"`   // 本地存放目錄
 	LastUpdated string `json:"last_updated"` // 最後更新時間
+}
+
+func (r *Registry) GetPhysicalPath() (string, error) {
+	prefix := "$" + ENV_REGISTER_PATH
+	if !strings.HasPrefix(r.LocalPath, prefix) {
+		return r.LocalPath, nil // Absolute path provided via -p
+	}
+
+	// Resolve $SKILL_MANAGER_REGISTER_PATH
+	envPath := os.Getenv(ENV_REGISTER_PATH)
+	if envPath == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		envPath = filepath.Join(cwd, "registries")
+	}
+
+	// Replace the prefix
+	relPath := strings.TrimPrefix(r.LocalPath, prefix)
+	relPath = strings.TrimPrefix(relPath, "/")
+	relPath = strings.TrimPrefix(relPath, "\\")
+	return filepath.Join(envPath, relPath), nil
 }
 
 type RegistriesConfig struct {

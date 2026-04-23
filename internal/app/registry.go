@@ -13,44 +13,44 @@ import (
 
 // RegisterAdd clones a git repository and registers it.
 func (a *App) RegisterAdd(url, name, customPath string) error {
-	if name == "" {
-		name = extractRepoName(url)
-	}
-
-	targetPath, err := a.resolveRegisterPath(customPath, name)
-	if err != nil {
-		return err
-	}
-
-	// Clone the repository
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		return err
-	}
-	cmd := exec.Command("git", "clone", url, targetPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git clone failed: %w", err)
-	}
-
 	// Load existing registries
 	config, err := a.store.LoadRegistriesConfig()
 	if err != nil {
 		return err
 	}
 
+	if name == "" {
+		name = extractRepoName(url)
+	}
+
 	// Check if already registered
 	for _, r := range config.Registries {
 		if r.Name == name {
-			return fmt.Errorf("registry with name '%s' already exists", name)
+			return fmt.Errorf("registry with name '%s' already exists, please use `register update %s`", name, name)
 		}
+	}
+
+	logicalPath, physicalPath, err := a.resolveRegisterPath(customPath, name)
+	if err != nil {
+		return err
+	}
+
+	// Clone the repository
+	if err := os.MkdirAll(filepath.Dir(physicalPath), 0755); err != nil {
+		return err
+	}
+	cmd := exec.Command("git", "clone", url, physicalPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git clone failed: %w", err)
 	}
 
 	// Add to registries
 	config.Registries = append(config.Registries, internal.Registry{
 		Name:        name,
 		URL:         url,
-		LocalPath:   targetPath,
+		LocalPath:   logicalPath,
 		LastUpdated: time.Now().Format(time.RFC3339),
 	})
 
@@ -59,7 +59,7 @@ func (a *App) RegisterAdd(url, name, customPath string) error {
 	}
 
 	// Trigger scan
-	_, err = a.ScanSkills(targetPath, name)
+	_, err = a.ScanSkills(physicalPath, name)
 	return err
 }
 
@@ -84,8 +84,13 @@ func (a *App) RegisterUpdate(name string) error {
 		return fmt.Errorf("registry '%s' not found", name)
 	}
 
+	physicalPath, err := registry.GetPhysicalPath()
+	if err != nil {
+		return err
+	}
+
 	// Git pull
-	cmd := exec.Command("git", "-C", registry.LocalPath, "pull")
+	cmd := exec.Command("git", "-C", physicalPath, "pull")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -99,7 +104,7 @@ func (a *App) RegisterUpdate(name string) error {
 	}
 
 	// Trigger re-scan
-	_, err = a.ScanSkills(registry.LocalPath, registry.Name)
+	_, err = a.ScanSkills(physicalPath, registry.Name)
 	return err
 }
 
@@ -120,19 +125,22 @@ func (a *App) RegisterRemove(name string, deleteFiles bool) error {
 	}
 
 	newRegistries := []internal.Registry{}
-	var targetPath string
-	found := false
-	for _, r := range config.Registries {
+	var registryToRemove *internal.Registry
+	for i, r := range config.Registries {
 		if r.Name == name {
-			found = true
-			targetPath = r.LocalPath
+			registryToRemove = &config.Registries[i]
 			continue
 		}
 		newRegistries = append(newRegistries, r)
 	}
 
-	if !found {
+	if registryToRemove == nil {
 		return fmt.Errorf("registry '%s' not found", name)
+	}
+
+	physicalPath, err := registryToRemove.GetPhysicalPath()
+	if err != nil {
+		return err
 	}
 
 	config.Registries = newRegistries
@@ -140,12 +148,12 @@ func (a *App) RegisterRemove(name string, deleteFiles bool) error {
 		return err
 	}
 
-	if deleteFiles && targetPath != "" {
+	if deleteFiles && physicalPath != "" {
 		// Use mv to a backup directory instead of rm, as per global_context
 		home, _ := os.UserHomeDir()
 		backupDir := filepath.Join(home, ".skill_manager", "backup", time.Now().Format("20060102150405"))
 		if err := os.MkdirAll(backupDir, 0755); err == nil {
-			os.Rename(targetPath, filepath.Join(backupDir, filepath.Base(targetPath)))
+			os.Rename(physicalPath, filepath.Join(backupDir, filepath.Base(physicalPath)))
 		}
 	}
 
@@ -172,27 +180,29 @@ func (a *App) cleanupSkills() error {
 	return a.store.SaveBaseConfig(cfg)
 }
 
-func (a *App) resolveRegisterPath(customPath, name string) (string, error) {
+func (a *App) resolveRegisterPath(customPath, name string) (string, string, error) {
 	if customPath != "" {
 		if !filepath.IsAbs(customPath) {
 			abs, err := filepath.Abs(customPath)
 			if err != nil {
-				return "", err
+				return "", "", err
 			}
 			customPath = abs
 		}
-		return customPath, nil
+		return customPath, customPath, nil
 	}
 
-	if envPath := os.Getenv("SKILL_MANAGER_REGISTER_PATH"); envPath != "" {
-		return filepath.Join(envPath, name), nil
+	logicalPath := filepath.Join("$"+internal.ENV_REGISTER_PATH, name)
+
+	if envPath := os.Getenv(internal.ENV_REGISTER_PATH); envPath != "" {
+		return logicalPath, filepath.Join(envPath, name), nil
 	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return filepath.Join(cwd, "registries", name), nil
+	return logicalPath, filepath.Join(cwd, "registries", name), nil
 }
 
 func extractRepoName(url string) string {

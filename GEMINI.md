@@ -22,7 +22,6 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具，旨�
 
 - `skill_manager register add <URL>`: 下載並註冊開源技能倉庫。
 - `skill_manager register update <NAME>`: 更新已註冊的遠端技能。
-- `skill_manager scan <DIR>`: 掃描本地目錄並納入管理。
 - `skill_manager add <SKILL_ID>`: 在當前專案中啟用技能。
 - `skill_manager sync`: 同步並建立軟鏈。
 

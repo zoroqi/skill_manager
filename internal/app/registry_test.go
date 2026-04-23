@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/zoroqi/skill_manager/internal"
 )
 
 func TestApp_ResolveRegisterPath(t *testing.T) {
@@ -14,23 +15,26 @@ func TestApp_ResolveRegisterPath(t *testing.T) {
 	a := New(tmpDir)
 
 	// Test case 1: customPath
-	path, err := a.resolveRegisterPath("/tmp/custom", "repo")
+	logical, physical, err := a.resolveRegisterPath("/tmp/custom", "repo")
 	assert.NoError(t, err)
-	assert.Equal(t, "/tmp/custom", path)
+	assert.Equal(t, "/tmp/custom", logical)
+	assert.Equal(t, "/tmp/custom", physical)
 
 	// Test case 2: env SKILL_MANAGER_REGISTER_PATH
-	os.Setenv("SKILL_MANAGER_REGISTER_PATH", "/tmp/env")
-	defer os.Unsetenv("SKILL_MANAGER_REGISTER_PATH")
-	path, err = a.resolveRegisterPath("", "repo")
+	os.Setenv(internal.ENV_REGISTER_PATH, "/tmp/env")
+	defer os.Unsetenv(internal.ENV_REGISTER_PATH)
+	logical, physical, err = a.resolveRegisterPath("", "repo")
 	assert.NoError(t, err)
-	assert.Equal(t, "/tmp/env/repo", path)
+	assert.Equal(t, filepath.Join("$"+internal.ENV_REGISTER_PATH, "repo"), logical)
+	assert.Equal(t, "/tmp/env/repo", physical)
 
 	// Test case 3: Default (cwd/registries/name)
-	os.Unsetenv("SKILL_MANAGER_REGISTER_PATH")
+	os.Unsetenv(internal.ENV_REGISTER_PATH)
 	cwd, _ := os.Getwd()
-	path, err = a.resolveRegisterPath("", "repo")
+	logical, physical, err = a.resolveRegisterPath("", "repo")
 	assert.NoError(t, err)
-	assert.Equal(t, filepath.Join(cwd, "registries", "repo"), path)
+	assert.Equal(t, filepath.Join("$"+internal.ENV_REGISTER_PATH, "repo"), logical)
+	assert.Equal(t, filepath.Join(cwd, "registries", "repo"), physical)
 }
 
 func TestExtractRepoName(t *testing.T) {

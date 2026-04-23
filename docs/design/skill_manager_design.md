@@ -12,7 +12,7 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
   - `id`: 唯一識別碼。
   - `name`: 技能名稱（通常為目錄名，亦可由 YAML 指定）。
   - `registry_name`: 所屬註冊專案名稱（若為本地掃描則為空）。
-  - `path`: 技能目錄的絕對路徑。
+  - `path`: 技能目錄的路徑。對於註冊的技能，存儲相對於註冊庫根目錄的**相對路徑**；在內存中加載時還原為絕對路徑。
   - `description`: 技能描述。
   - `metadata`: `map[string]any`，用於存儲從 `SKILL.md` 中解析出的 YAML 前言資訊。
 
@@ -30,7 +30,7 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 - **核心字段:**
   - `name`: 註冊名稱，採用 `<org>_<repo>` 格式以避免命名衝突。
   - `url`: 原始 Git URL (支援 HTTPS/SSH)。
-  - `local_path`: 下載後的本地絕對路徑。
+  - `local_path`: 下載後的本地邏輯路徑，預設包含 `$SKILL_MANAGER_REGISTER_PATH` 前綴。
   - `last_updated`: 最後一次 `update` 的時間。
 
 ### 2.4 上下文配置 (.context.json / global_context.json)
@@ -47,7 +47,7 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 ## 3. 功能邏輯
 
 ### 3.1 技能掃描 (Scanner)
-遍歷目標目錄及其子目錄，尋找包含 `SKILL.md` 的資料夾。
+遍歷目標目錄及其子目錄，尋找包含 `SKILL.md` 的資料夾。此功能主要由 `register` 流程內部觸發。
 - **遞歸掃描:** 使用 `filepath.WalkDir` 支援發現深層結構（如 `skills/` 子目錄）中的技能。
 - **安全過濾:** 自動跳過隱藏目錄（如 `.git/`, `.github/`）。
 - **原子性發現:** 一旦在某個目錄發現 `SKILL.md`，即將該目錄視為一個技能單元，停止向該目錄深層繼續掃描，避免重複識別。
@@ -72,8 +72,8 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 - **Status:**
   - 展示當前上下文的所有活性技能、啟用的分組及停用技能。
 - **Register (Git-centric):**
-  - **Add:** 執行 `git clone`，將倉庫存放到預設路徑（環境變數或 `registries/` 目錄），並自動觸發 `scan`。
-  - **Update:** 針對註冊專案執行 `git pull` 並重新 `scan`。
+  - **Add:** 執行 `git clone`，將倉庫存放到預設路徑（環境變數或 `registries/` 目錄），並自動觸發 `ScanSkills`。在 `registries.json` 中使用邏輯路徑存儲，以便遷移。
+  - **Update:** 針對註冊專案執行 `git pull` 並重新執行 `ScanSkills`。
   - **Remove:** 支援 `--delete` 參數，將本地目錄移動至備份區，並清理 `skills.json` 中的無效路徑。
 
 ## 4. 命令結構 (CLI)
@@ -81,9 +81,11 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 - **group:** 管理技能組（create, delete, add-skill, remove-skill, list）。
 - **add / remove:** 支援單體技能或使用 `--group` 標誌。
 - **sync:** 強制同步專案環境與配置狀態。
-- **scan:** 更新全局技能庫。
+- **status:** 展示當前上下文的所有活性技能、啟用的分組及停用技能。
 
-## 4. 目錄與配置
-- **全局配置:** 預設為 `~/.skill_manager`。
-- **環境變數:** `SKILL_MANAGER_CONFIG` 可自定義全局配置路徑。
+## 5. 目錄與配置
+- **全局配置目錄:** 預設為 `~/.skill_manager`。
+- **環境變數:**
+  - `SKILL_MANAGER_CONFIG`: 自定義全局配置路徑（包含 `skills.json`, `registries.json` 等）。
+  - `SKILL_MANAGER_REGISTER_PATH`: 自定義遠端技能倉庫的基礎存放路徑。
 - **Agent 目錄:** 支援 `.gemini`, `.claude`, `.codex`, `.opencode`, `.agents` 等。
