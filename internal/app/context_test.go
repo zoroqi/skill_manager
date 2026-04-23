@@ -10,9 +10,10 @@ func TestGetStatus(t *testing.T) {
 	app, _ := setupApp(t)
 	workDir := t.TempDir()
 
-	ctxCfg, skills, err := app.GetStatus(workDir, false)
+	ctxCfg, skills, groups, err := app.GetStatus(workDir, false)
 	assert.NoError(t, err)
 	assert.Empty(t, skills)
+	assert.Empty(t, groups)
 	assert.Equal(t, "project", ctxCfg.Scope)
 }
 

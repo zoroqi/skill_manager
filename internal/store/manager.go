@@ -105,6 +105,12 @@ func (m *Manager) SaveBaseConfig(cfg internal.BaseConfig) error {
 			}
 		}
 	}
+	sort.Slice(cfg.Skills, func(i, j int) bool {
+		if cfg.Skills[i].RegistryName == cfg.Skills[j].RegistryName {
+			return cfg.Skills[i].Name < cfg.Skills[j].Name
+		}
+		return cfg.Skills[i].RegistryName < cfg.Skills[j].RegistryName
+	})
 	return m.saveJSON(internal.FILENAME_SKILLS, cfg)
 }
 

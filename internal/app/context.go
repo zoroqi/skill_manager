@@ -139,33 +139,36 @@ func (a *App) SyncContext(workDir string, global, force bool) error {
 	return a.syncContext(targetDir, ctxCfg, force)
 }
 
-func (a *App) GetStatus(workDir string, global bool) (internal.ContextConfig, []internal.Skill, error) {
+func (a *App) GetStatus(workDir string, global bool) (internal.ContextConfig, []internal.Skill, []internal.Group, error) {
 	var ctxCfg internal.ContextConfig
 	var err error
 
 	baseCfg, err := a.store.LoadBaseConfig()
 	if err != nil {
-		return ctxCfg, nil, fmt.Errorf("failed to load base config: %w", err)
+		return ctxCfg, nil, nil, fmt.Errorf("failed to load base config: %w", err)
 	}
 
 	if global {
 		ctxCfg, err = a.store.LoadContextConfig(internal.FILENAME_GLOBAL_CONTEXT)
 		if err != nil {
-			return ctxCfg, nil, fmt.Errorf("failed to load global context: %w", err)
+			return ctxCfg, nil, nil, fmt.Errorf("failed to load global context: %w", err)
 		}
 	} else {
 		targetDir := workDir
 		if targetDir == "" {
 			targetDir, err = os.Getwd()
 			if err != nil {
-				return ctxCfg, nil, err
+				return ctxCfg, nil, nil, err
 			}
 		}
 		ctxCfg, err = store.EnsureLocalContext(targetDir)
 		if err != nil {
-			return ctxCfg, nil, fmt.Errorf("failed to load local context: %w", err)
+			return ctxCfg, nil, nil, fmt.Errorf("failed to load local context: %w", err)
 		}
 	}
-
-	return ctxCfg, baseCfg.Skills, nil
+	groups, err := a.store.LoadGroupsConfig()
+	if err != nil {
+		return ctxCfg, nil, nil, fmt.Errorf("failed to load groups: %w", err)
+	}
+	return ctxCfg, baseCfg.Skills, groups.Groups, nil
 }

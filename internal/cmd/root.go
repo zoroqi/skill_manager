@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/zoroqi/skill_manager/internal/app"
+	"os"
 )
 
 var rootCmd = &cobra.Command{
@@ -26,5 +27,6 @@ func init() {
 }
 
 func Execute() error {
+	rootCmd.SetOut(os.Stdout)
 	return rootCmd.Execute()
 }

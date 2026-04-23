@@ -12,9 +12,10 @@ var listCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		cmd.Printf("%-35s %-20s %s\n", "ID", "Name", "Path")
+
+		cmd.Printf("%-35s %-20s %s\n", "ID", "Register", "Name")
 		for _, s := range skills {
-			cmd.Printf("%-35s %-20s %s\n", s.ID, s.Name, s.Path)
+			cmd.Printf("%-35s %-30s %s\n", s.ID, s.RegistryName, s.Name)
 		}
 		return nil
 	},
