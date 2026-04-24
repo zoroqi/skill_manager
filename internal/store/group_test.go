@@ -78,7 +78,7 @@ func TestSyncContext(t *testing.T) {
 	os.MkdirAll(filepath.Join(agentDir, "skills"), 0755)
 
 	ctxCfg := &internal.ContextConfig{
-		ActiveGroups: []string{"g1"},
+		ActiveGroups: []internal.GroupUsage{{Name: "g1"}},
 		ActiveSkills: []internal.SkillUsage{
 			{ID: "s2", Agents: []string{"gemini"}},
 		},
@@ -105,7 +105,7 @@ func TestSyncContext(t *testing.T) {
 	info, _ := os.Lstat(conflictPath)
 	assert.True(t, info.Mode()&os.ModeSymlink != 0, "Should be a symlink now")
 
-	ctxCfg.ActiveGroups = []string{}
+	ctxCfg.ActiveGroups = []internal.GroupUsage{}
 	err = manager.SyncContext(projectDir, ctxCfg, true)
 	assert.NoError(t, err)
 	_, err = os.Lstat(filepath.Join(projectDir, ".gemini", "skills", "skill-1"))

@@ -38,11 +38,14 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 - **技能使用狀況 (SkillUsage):**
   - `id`: 技能 ID。
   - `agents`: 字串列表，記錄該技能被軟鏈到了哪些 Agent（如 `["gemini", "claude"]`）。
+- **技能組使用狀況 (GroupUsage):**
+  - `name`: 技能組名稱。
+  - `agents`: 字串列表，記錄該技能組關聯的 Agent 目錄。若為空則預設關聯所有偵測到的 Agent 目錄。
 - **ContextConfig:**
   - `scope`: `global` 或 `project`。
   - `active_skills`: `[]SkillUsage`，記錄目前啟用的單體技能及其關聯的 Agent。
   - `inactive_skills`: `[]SkillUsage`，記錄目前已停用但保留在專案配置中的技能。
-  - `active_groups`: `[]string`，記錄目前啟用的技能組名稱清單。
+  - `active_groups`: `[]GroupUsage`，記錄目前啟用的技能組及其關聯的 Agent。
 
 ## 3. 功能邏輯
 
@@ -56,7 +59,7 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 - **Add:**
   - 支援 `--group <name>`：將分組加入 `active_groups`。
   - 支援單體技能：將技能加入 `active_skills`。
-  - 若指定多個 Agent，會合併現有的 `agents` 名單。
+  - **Agent 支援:** 可透過 `--agent` 指定特定 Agent。若為技能組，會合併現有的 `agents` 名單。
   - 自動觸發 **Sync** 邏輯。
 - **Stop:**
   - 根據 `--agent` 指定移除特定 Agent 下的軟鏈。
@@ -64,6 +67,7 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具。透�
 - **Remove:**
   - 支援 `--group <name>`：從 `active_groups` 中移除分組。
   - 支援單體技能：從 `active_skills` 完全刪除。
+  - **局部移除:** 若指定 `--agent`，則僅移除該技能或技能組與特定 Agent 的關聯。
   - 自動觸發 **Sync** 邏輯。
 - **Sync:**
   - 計算預期狀態：結合 `active_skills` 與 `active_groups` 內的所有技能，決定每個 Agent 目錄下應該存在的軟鏈。

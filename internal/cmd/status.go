@@ -72,12 +72,17 @@ var statusCmd = &cobra.Command{
 		if len(ctxCfg.ActiveGroups) == 0 {
 			cmd.Println("  (none)")
 		} else {
-			cmd.Printf("  %-20s %-20s %s\n", "Name", "Agents", "Register")
 			for _, usage := range ctxCfg.ActiveGroups {
-				if group, ok := groupsSkillsMap[usage]; ok {
+				agents := strings.Join(usage.Agents, ",")
+				if agents == "" {
+					agents = "(all)"
+				}
+				cmd.Printf("Group: %s (Agents: %s)\n", usage.Name, agents)
+				cmd.Printf("  %-20s %-20s %s\n", "Name", "Agents", "Register")
+				if group, ok := groupsSkillsMap[usage.Name]; ok {
 					for _, id := range group {
 						if name, ok := skillMap[id]; ok {
-							cmd.Printf("  %-20s %-20s %s\n", name, "", skillRegisterMap[id])
+							cmd.Printf("  %-20s %-20s %s\n", name, strings.Join(usage.Agents, ","), skillRegisterMap[id])
 						} else {
 							cmd.Printf("  %-20s (missing from scanned library)\n", id)
 						}

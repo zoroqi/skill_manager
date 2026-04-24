@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -10,6 +11,7 @@ import (
 var (
 	removeGlobal bool
 	removeGroup  string
+	removeAgents string
 )
 
 var removeCmd = &cobra.Command{
@@ -22,7 +24,11 @@ var removeCmd = &cobra.Command{
 		}
 
 		if removeGroup != "" {
-			if err := application.RemoveGroup(targetDir, removeGroup, removeGlobal); err != nil {
+			var agents []string
+			if removeAgents != "" {
+				agents = strings.Split(removeAgents, ",")
+			}
+			if err := application.RemoveGroup(targetDir, removeGroup, agents, removeGlobal); err != nil {
 				return err
 			}
 			fmt.Printf("Group '%s' removed and synced successfully.\n", removeGroup)
@@ -49,5 +55,6 @@ var removeCmd = &cobra.Command{
 func init() {
 	removeCmd.Flags().BoolVarP(&removeGlobal, "global", "g", false, "Remove skill from global context")
 	removeCmd.Flags().StringVar(&removeGroup, "group", "", "Name of the group to remove")
+	removeCmd.Flags().StringVar(&removeAgents, "agent", "", "Comma-separated list of agents to remove from group")
 	rootCmd.AddCommand(removeCmd)
 }

@@ -45,7 +45,7 @@ func TestConfigJSONFormat(t *testing.T) {
 		ActiveSkills: []internal.SkillUsage{
 			{ID: "e4d909c290d0fb1ca068ffaddf22cbd0", Agents: []string{"gemini"}},
 		},
-		ActiveGroups: []string{"g1"},
+		ActiveGroups: []internal.GroupUsage{{Name: "g1"}},
 	}
 	data, err = json.Marshal(contextConfig)
 	assert.NoError(t, err)

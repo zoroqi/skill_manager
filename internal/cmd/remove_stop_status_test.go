@@ -45,6 +45,18 @@ func TestRemoveStopStatus(t *testing.T) {
 	os.Chdir(projectDir)
 	defer os.Chdir(oldWd)
 
+	// Reset globals
+	addGroup = ""
+	addAgents = ""
+	addGlobal = false
+	addRegister = ""
+	addForce = false
+	removeGroup = ""
+	removeAgents = ""
+	removeGlobal = false
+	stopAgents = ""
+	stopGlobal = false
+
 	// 1. Add skill
 	addAgents = "gemini"
 	addGlobal = false

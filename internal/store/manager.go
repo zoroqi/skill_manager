@@ -73,7 +73,7 @@ func (m *Manager) Init() error {
 		Scope:          "global",
 		ActiveSkills:   []internal.SkillUsage{},
 		InactiveSkills: []internal.SkillUsage{},
-		ActiveGroups:   []string{},
+		ActiveGroups:   []internal.GroupUsage{},
 	}
 	if err := m.SaveContextConfig(globalContext, internal.FILENAME_GLOBAL_CONTEXT); err != nil {
 		return err
@@ -313,7 +313,7 @@ func EnsureLocalContext(targetDir string) (internal.ContextConfig, error) {
 				Scope:          "project",
 				ActiveSkills:   []internal.SkillUsage{},
 				InactiveSkills: []internal.SkillUsage{},
-				ActiveGroups:   []string{},
+				ActiveGroups:   []internal.GroupUsage{},
 			}, nil
 		}
 		return cfg, err

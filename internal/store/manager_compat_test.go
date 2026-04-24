@@ -48,13 +48,17 @@ func (m *Manager) SyncContext(targetDir string, ctxCfg *internal.ContextConfig, 
 	}
 
 	existingAgents := FindExistingAgents(targetDir)
-	for _, groupName := range ctxCfg.ActiveGroups {
-		group, ok := groupMap[groupName]
+	for _, usage := range ctxCfg.ActiveGroups {
+		group, ok := groupMap[usage.Name]
 		if !ok {
 			continue
 		}
+		agents := usage.Agents
+		if len(agents) == 0 {
+			agents = existingAgents
+		}
 		for _, skillID := range group.SkillIDs {
-			desiredSkills[skillID] = mergeAgentsCompat(desiredSkills[skillID], existingAgents)
+			desiredSkills[skillID] = mergeAgentsCompat(desiredSkills[skillID], agents)
 		}
 	}
 

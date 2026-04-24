@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/zoroqi/skill_manager/internal"
@@ -165,7 +164,7 @@ func (a *App) AddSkill(workDir, skillName, registryName string, agents []string,
 	return saveCtx()
 }
 
-func (a *App) AddGroup(workDir, groupName string, global, force bool) error {
+func (a *App) AddGroup(workDir, groupName string, agents []string, global, force bool) error {
 	targetDir, ctxCfg, saveCtx, err := a.resolveContext(workDir, global)
 	if err != nil {
 		return err
@@ -179,8 +178,16 @@ func (a *App) AddGroup(workDir, groupName string, global, force bool) error {
 		return fmt.Errorf("group '%s' not found", groupName)
 	}
 
-	if !slices.Contains(ctxCfg.ActiveGroups, groupName) {
-		ctxCfg.ActiveGroups = append(ctxCfg.ActiveGroups, groupName)
+	found := false
+	for i, usage := range ctxCfg.ActiveGroups {
+		if usage.Name == groupName {
+			ctxCfg.ActiveGroups[i].Agents = mergeAgents(usage.Agents, agents)
+			found = true
+			break
+		}
+	}
+	if !found {
+		ctxCfg.ActiveGroups = append(ctxCfg.ActiveGroups, internal.GroupUsage{Name: groupName, Agents: agents})
 	}
 
 	if err := a.syncContext(targetDir, ctxCfg, force); err != nil {
@@ -219,17 +226,42 @@ func (a *App) RemoveSkill(workDir, skillName string, global bool) error {
 	return saveCtx()
 }
 
-func (a *App) RemoveGroup(workDir, groupName string, global bool) error {
+func (a *App) RemoveGroup(workDir, groupName string, agents []string, global bool) error {
 	targetDir, ctxCfg, saveCtx, err := a.resolveContext(workDir, global)
 	if err != nil {
 		return err
 	}
 
-	newGroups := []string{}
+	newGroups := []internal.GroupUsage{}
 	found := false
 	for _, g := range ctxCfg.ActiveGroups {
-		if g == groupName {
+		if g.Name == groupName {
 			found = true
+			if len(agents) == 0 {
+				continue
+			}
+			// Handle partial agent removal
+			currentAgents := g.Agents
+			if len(currentAgents) == 0 {
+				currentAgents = store.FindExistingAgents(targetDir)
+			}
+
+			agentMap := make(map[string]bool)
+			for _, a := range agents {
+				agentMap[a] = true
+			}
+
+			updatedAgents := []string{}
+			for _, a := range currentAgents {
+				if !agentMap[a] {
+					updatedAgents = append(updatedAgents, a)
+				}
+			}
+
+			if len(updatedAgents) > 0 {
+				g.Agents = updatedAgents
+				newGroups = append(newGroups, g)
+			}
 			continue
 		}
 		newGroups = append(newGroups, g)

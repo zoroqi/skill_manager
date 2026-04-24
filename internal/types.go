@@ -2,6 +2,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,12 +86,33 @@ type SkillUsage struct {
 	Agents []string `json:"agents"`
 }
 
+type GroupUsage struct {
+	Name   string   `json:"name"`
+	Agents []string `json:"agents"`
+}
+
+func (g *GroupUsage) UnmarshalJSON(data []byte) error {
+	var name string
+	if err := json.Unmarshal(data, &name); err == nil {
+		g.Name = name
+		return nil
+	}
+
+	type alias GroupUsage
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*g = GroupUsage(a)
+	return nil
+}
+
 type ContextConfig struct {
 	Version        string       `json:"version"`
 	Scope          string       `json:"scope"`
 	ActiveSkills   []SkillUsage `json:"active_skills"`
 	InactiveSkills []SkillUsage `json:"inactive_skills,omitempty"`
-	ActiveGroups   []string     `json:"active_groups"`
+	ActiveGroups   []GroupUsage `json:"active_groups"`
 }
 
 type ContextSummary struct {

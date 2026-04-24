@@ -26,7 +26,11 @@ var addCmd = &cobra.Command{
 		}
 
 		if addGroup != "" {
-			if err := application.AddGroup(targetDir, addGroup, addGlobal, addForce); err != nil {
+			var agents []string
+			if addAgents != "" {
+				agents = strings.Split(addAgents, ",")
+			}
+			if err := application.AddGroup(targetDir, addGroup, agents, addGlobal, addForce); err != nil {
 				return err
 			}
 			fmt.Printf("Group '%s' added and synced successfully.\n", addGroup)
