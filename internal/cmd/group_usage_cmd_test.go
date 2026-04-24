@@ -25,7 +25,7 @@ func TestGroupUsageCLI(t *testing.T) {
 	// Create a dummy skill and group
 	skillPath := filepath.Join(tempDir, "skill1")
 	os.MkdirAll(skillPath, 0755)
-	
+
 	baseCfg := internal.BaseConfig{
 		Version: internal.CONFIG_VERSION,
 		Skills: []internal.Skill{
@@ -45,7 +45,7 @@ func TestGroupUsageCLI(t *testing.T) {
 	// Project setup
 	projectDir := filepath.Join(tempDir, "project")
 	os.MkdirAll(projectDir, 0755)
-	
+
 	// Create agent dirs
 	os.MkdirAll(filepath.Join(projectDir, ".gemini", "skills"), 0755)
 	os.MkdirAll(filepath.Join(projectDir, ".claude", "skills"), 0755)

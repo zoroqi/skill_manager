@@ -14,8 +14,8 @@ const (
 	FILENAME_GROUPS         = "groups.json"
 	FILENAME_SUMMARY        = "summary.json"
 	FILENAME_REGISTRIES     = "registries.json"
-	FILENAME_CONTEXT        = ".context.json"
-	FILENAME_GLOBAL_CONTEXT = "global_context.json"
+	FILENAME_CONTEXT        = ".skills_manager.json"
+	FILENAME_GLOBAL_CONTEXT = "global.json"
 
 	ENV_CONFIG_DIR    = "SKILL_MANAGER_CONFIG"
 	ENV_REGISTER_PATH = "SKILL_MANAGER_REGISTER_PATH"
