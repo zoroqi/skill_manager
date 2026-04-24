@@ -27,23 +27,13 @@ func (a *App) DeleteGroup(name string) error {
 	return a.store.DeleteGroup(name)
 }
 
-func (a *App) AddSkillToGroup(groupName string, skillNames []string) error {
-	baseCfg, err := a.store.LoadBaseConfig()
-	if err != nil {
-		return err
-	}
+func (a *App) AddSkillToGroup(groupName string, skillNames []string, registryName string) error {
 	for _, sn := range skillNames {
-		var skillID string
-		for _, s := range baseCfg.Skills {
-			if s.Name == sn {
-				skillID = s.ID
-				break
-			}
+		skill, err := a.resolveSkill(sn, registryName)
+		if err != nil {
+			return err
 		}
-		if skillID == "" {
-			return fmt.Errorf("skill '%s' not found", sn)
-		}
-		if err := a.store.AddSkillToGroup(groupName, skillID); err != nil {
+		if err := a.store.AddSkillToGroup(groupName, skill.ID); err != nil {
 			return err
 		}
 	}

@@ -43,7 +43,7 @@ func TestAddRemoveSkillToGroup(t *testing.T) {
 	cfg.Skills = append(cfg.Skills, internal.Skill{ID: "s1", Name: "my-skill"})
 	mgr.SaveBaseConfig(cfg)
 
-	err := app.AddSkillToGroup("g1", []string{"my-skill"})
+	err := app.AddSkillToGroup("g1", []string{"my-skill"}, "")
 	assert.NoError(t, err)
 
 	groups, _ := app.ListGroups()

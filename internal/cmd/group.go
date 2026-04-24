@@ -43,6 +43,8 @@ var groupDeleteCmd = &cobra.Command{
 	},
 }
 
+var groupAddRegister string
+
 var groupAddSkillCmd = &cobra.Command{
 	Use:   "add <group_name> <skill_name>...",
 	Short: "Add one or more skills to a group",
@@ -50,7 +52,7 @@ var groupAddSkillCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		groupName := args[0]
 		skillNames := args[1:]
-		if err := application.AddSkillToGroup(groupName, skillNames); err != nil {
+		if err := application.AddSkillToGroup(groupName, skillNames, groupAddRegister); err != nil {
 			return err
 		}
 		for _, sn := range skillNames {
@@ -112,6 +114,8 @@ var groupListCmd = &cobra.Command{
 }
 
 func init() {
+	groupAddSkillCmd.Flags().StringVarP(&groupAddRegister, "register", "r", "", "Specify the registry name if there are multiple skills with the same name")
+
 	groupCmd.AddCommand(groupCreateCmd)
 	groupCmd.AddCommand(groupDeleteCmd)
 	groupCmd.AddCommand(groupAddSkillCmd)

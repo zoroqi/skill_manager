@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/zoroqi/skill_manager/internal"
 	"github.com/zoroqi/skill_manager/internal/store"
@@ -96,6 +97,40 @@ func stopSkillInContext(cfg *internal.ContextConfig, skillID string, agents []st
 	cfg.InactiveSkills = append(cfg.InactiveSkills, *targetUsage)
 }
 
+func (a *App) resolveSkill(skillName, registryName string) (*internal.Skill, error) {
+	cfg, err := a.store.LoadBaseConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load base config: %w", err)
+	}
+
+	var targetSkills []internal.Skill
+	for _, s := range cfg.Skills {
+		if s.Name == skillName {
+			if registryName == "" || s.RegistryName == registryName {
+				targetSkills = append(targetSkills, s)
+			}
+		}
+	}
+
+	if len(targetSkills) == 0 {
+		return nil, fmt.Errorf("skill '%s' not found. please scan it first", skillName)
+	}
+
+	if len(targetSkills) > 1 {
+		var registries []string
+		for _, s := range targetSkills {
+			reg := s.RegistryName
+			if reg == "" {
+				reg = "local"
+			}
+			registries = append(registries, reg)
+		}
+		return nil, fmt.Errorf("multiple skills found with name '%s' in registries: %s. please specify the registry using --register flag", skillName, strings.Join(registries, ", "))
+	}
+
+	return &targetSkills[0], nil
+}
+
 func (a *App) ListSkills() ([]internal.Skill, error) {
 	cfg, err := a.store.LoadBaseConfig()
 	if err != nil {
@@ -104,26 +139,15 @@ func (a *App) ListSkills() ([]internal.Skill, error) {
 	return cfg.Skills, nil
 }
 
-func (a *App) AddSkill(workDir, skillName string, agents []string, global, force bool) error {
+func (a *App) AddSkill(workDir, skillName, registryName string, agents []string, global, force bool) error {
 	targetDir, ctxCfg, saveCtx, err := a.resolveContext(workDir, global)
 	if err != nil {
 		return err
 	}
 
-	cfg, err := a.store.LoadBaseConfig()
+	targetSkill, err := a.resolveSkill(skillName, registryName)
 	if err != nil {
-		return fmt.Errorf("failed to load base config: %w", err)
-	}
-
-	var targetSkill *internal.Skill
-	for _, s := range cfg.Skills {
-		if s.Name == skillName {
-			targetSkill = &s
-			break
-		}
-	}
-	if targetSkill == nil {
-		return fmt.Errorf("skill '%s' not found. please scan it first", skillName)
+		return err
 	}
 
 	if len(agents) == 0 {

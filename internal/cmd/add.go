@@ -9,10 +9,11 @@ import (
 )
 
 var (
-	addGlobal bool
-	addAgents string
-	addGroup  string
-	addForce  bool
+	addGlobal   bool
+	addAgents   string
+	addRegister string
+	addGroup    string
+	addForce    bool
 )
 
 var addCmd = &cobra.Command{
@@ -41,7 +42,7 @@ var addCmd = &cobra.Command{
 			agents = strings.Split(addAgents, ",")
 		}
 
-		if err := application.AddSkill(targetDir, args[0], agents, addGlobal, addForce); err != nil {
+		if err := application.AddSkill(targetDir, args[0], addRegister, agents, addGlobal, addForce); err != nil {
 			return err
 		}
 
@@ -57,6 +58,7 @@ var addCmd = &cobra.Command{
 func init() {
 	addCmd.Flags().BoolVarP(&addGlobal, "global", "g", false, "Add skill globally")
 	addCmd.Flags().StringVar(&addAgents, "agent", "", "Comma-separated list of agents to link (e.g., gemini,claude)")
+	addCmd.Flags().StringVarP(&addRegister, "register", "r", "", "Specify the registry name if there are multiple skills with the same name")
 	addCmd.Flags().StringVar(&addGroup, "group", "", "Name of the group to add")
 	addCmd.Flags().BoolVarP(&addForce, "force", "f", false, "Force overwrite existing symlinks")
 	rootCmd.AddCommand(addCmd)
