@@ -70,7 +70,6 @@ type BaseConfig struct {
 }
 
 type Group struct {
-	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	SkillIDs    []string `json:"skill_ids"`
@@ -89,7 +88,6 @@ type SkillUsage struct {
 type ContextConfig struct {
 	Version        string       `json:"version"`
 	Scope          string       `json:"scope"`
-	TargetDir      string       `json:"target_dir"`
 	ActiveSkills   []SkillUsage `json:"active_skills"`
 	InactiveSkills []SkillUsage `json:"inactive_skills,omitempty"`
 	ActiveGroups   []string     `json:"active_groups"`

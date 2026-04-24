@@ -71,7 +71,6 @@ func (m *Manager) Init() error {
 	globalContext := internal.ContextConfig{
 		Version:        internal.CONFIG_VERSION,
 		Scope:          "global",
-		TargetDir:      m.configDir,
 		ActiveSkills:   []internal.SkillUsage{},
 		InactiveSkills: []internal.SkillUsage{},
 		ActiveGroups:   []string{},
@@ -210,7 +209,6 @@ func (m *Manager) CreateGroup(name, description string) error {
 		}
 	}
 	cfg.Groups = append(cfg.Groups, internal.Group{
-		ID:          name, // Using name as ID for simplicity
 		Name:        name,
 		Description: description,
 		SkillIDs:    []string{},
@@ -313,7 +311,6 @@ func EnsureLocalContext(targetDir string) (internal.ContextConfig, error) {
 			return internal.ContextConfig{
 				Version:        internal.CONFIG_VERSION,
 				Scope:          "project",
-				TargetDir:      targetDir,
 				ActiveSkills:   []internal.SkillUsage{},
 				InactiveSkills: []internal.SkillUsage{},
 				ActiveGroups:   []string{},

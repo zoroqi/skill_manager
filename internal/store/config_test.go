@@ -27,7 +27,6 @@ func TestConfigJSONFormat(t *testing.T) {
 	assert.Contains(t, string(data), `"skills":[{`)
 
 	group := internal.Group{
-		ID:          "g1",
 		Name:        "group1",
 		Description: "desc",
 		SkillIDs:    []string{"e4d909c290d0fb1ca068ffaddf22cbd0"},
@@ -41,9 +40,8 @@ func TestConfigJSONFormat(t *testing.T) {
 	assert.Contains(t, string(data), `"groups":[{`)
 
 	contextConfig := internal.ContextConfig{
-		Version:   internal.CONFIG_VERSION,
-		Scope:     "project",
-		TargetDir: "/project/dir",
+		Version: internal.CONFIG_VERSION,
+		Scope:   "project",
 		ActiveSkills: []internal.SkillUsage{
 			{ID: "e4d909c290d0fb1ca068ffaddf22cbd0", Agents: []string{"gemini"}},
 		},
