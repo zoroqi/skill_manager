@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/zoroqi/skill_manager/internal"
@@ -322,7 +323,11 @@ func (a *App) resolveContext(workDir string, global bool) (string, *internal.Con
 			return "", nil, nil, fmt.Errorf("failed to load global context: %w", err)
 		}
 		saveCtx := func() error {
-			return a.store.SaveContextConfig(ctxCfg, internal.FILENAME_GLOBAL_CONTEXT)
+			err := a.store.SaveContextConfig(ctxCfg, internal.FILENAME_GLOBAL_CONTEXT)
+			if err == nil {
+				_ = a.store.UpdateContextSummary("global", filepath.Join(a.store.GetConfigDir(), internal.FILENAME_GLOBAL_CONTEXT))
+			}
+			return err
 		}
 		return targetDir, &ctxCfg, saveCtx, nil
 	}
@@ -333,7 +338,11 @@ func (a *App) resolveContext(workDir string, global bool) (string, *internal.Con
 		return "", nil, nil, fmt.Errorf("failed to load local context: %w", err)
 	}
 	saveCtx := func() error {
-		return store.SaveLocalContext(targetDir, ctxCfg)
+		err := store.SaveLocalContext(targetDir, ctxCfg)
+		if err == nil {
+			_ = a.store.UpdateContextSummary(targetDir, filepath.Join(targetDir, internal.FILENAME_CONTEXT))
+		}
+		return err
 	}
 	return targetDir, &ctxCfg, saveCtx, nil
 }

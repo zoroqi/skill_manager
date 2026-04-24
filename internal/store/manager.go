@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/zoroqi/skill_manager/internal"
 )
@@ -60,7 +61,7 @@ func (m *Manager) Init() error {
 		{
 			Dir:         "global",
 			ConfigPath:  filepath.Join(m.configDir, internal.FILENAME_GLOBAL_CONTEXT),
-			LastUpdated: "", // Can be filled with current time
+			LastUpdated: time.Now().Format(time.RFC3339),
 		},
 	}}
 	if err := m.SaveSummaryConfig(summary); err != nil {
@@ -185,6 +186,38 @@ func (m *Manager) LoadSummaryConfig() (internal.SummaryConfig, error) {
 		return internal.SummaryConfig{Version: internal.CONFIG_VERSION, Contexts: []internal.ContextSummary{}}, nil
 	}
 	return cfg, err
+}
+
+func (m *Manager) GetConfigDir() string {
+	return m.configDir
+}
+
+func (m *Manager) UpdateContextSummary(dir, configPath string) error {
+	summary, err := m.LoadSummaryConfig()
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().Format(time.RFC3339)
+	found := false
+	for i, ctx := range summary.Contexts {
+		if ctx.Dir == dir {
+			summary.Contexts[i].LastUpdated = now
+			summary.Contexts[i].ConfigPath = configPath
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		summary.Contexts = append(summary.Contexts, internal.ContextSummary{
+			Dir:         dir,
+			ConfigPath:  configPath,
+			LastUpdated: now,
+		})
+	}
+
+	return m.SaveSummaryConfig(summary)
 }
 
 func (m *Manager) SaveContextConfig(cfg internal.ContextConfig, filename string) error {

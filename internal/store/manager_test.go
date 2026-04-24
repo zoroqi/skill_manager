@@ -77,3 +77,39 @@ func TestPathRelativization(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "skill_a", diskCfg.Skills[0].Path)
 }
+
+func TestUpdateContextSummary(t *testing.T) {
+	tempDir := t.TempDir()
+	manager := NewManager(tempDir)
+
+	err := manager.Init()
+	assert.NoError(t, err)
+
+	dir := "/path/to/project"
+	configPath := "/path/to/project/context.json"
+	err = manager.UpdateContextSummary(dir, configPath)
+	assert.NoError(t, err)
+
+	summary, err := manager.LoadSummaryConfig()
+	assert.NoError(t, err)
+
+	// Should have global and the new one
+	assert.Len(t, summary.Contexts, 2)
+
+	found := false
+	for _, ctx := range summary.Contexts {
+		if ctx.Dir == dir {
+			assert.Equal(t, configPath, ctx.ConfigPath)
+			assert.NotEmpty(t, ctx.LastUpdated)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found)
+
+	// Update again
+	err = manager.UpdateContextSummary(dir, configPath)
+	assert.NoError(t, err)
+	summary2, _ := manager.LoadSummaryConfig()
+	assert.Len(t, summary2.Contexts, 2)
+}
