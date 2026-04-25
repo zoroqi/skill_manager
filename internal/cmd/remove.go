@@ -39,7 +39,12 @@ var removeCmd = &cobra.Command{
 			return fmt.Errorf("please specify a skill name or use --group flag")
 		}
 
-		if err := application.RemoveSkill(targetDir, args[0], removeGlobal); err != nil {
+		var agents []string
+		if removeAgents != "" {
+			agents = strings.Split(removeAgents, ",")
+		}
+
+		if err := application.RemoveSkill(targetDir, args[0], agents, removeGlobal); err != nil {
 			return err
 		}
 

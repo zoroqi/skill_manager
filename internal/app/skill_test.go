@@ -71,7 +71,7 @@ func TestRemoveSkill(t *testing.T) {
 	os.MkdirAll(filepath.Join(projectDir, ".gemini", "skills"), 0755)
 
 	app.AddSkill(projectDir, "my-skill", "", []string{"gemini"}, false, false)
-	err := app.RemoveSkill(projectDir, "my-skill", false)
+	err := app.RemoveSkill(projectDir, "my-skill", nil, false)
 	assert.NoError(t, err)
 }
 
@@ -130,21 +130,3 @@ func TestAddSkillUpdatesSummary(t *testing.T) {
 	assert.True(t, found, "Project directory should be in summary")
 }
 
-func TestStopSkill(t *testing.T) {
-	app, configDir := setupApp(t)
-
-	skillPath := filepath.Join(configDir, "my-skill")
-	os.WriteFile(skillPath, []byte("skill"), 0644)
-
-	mgr := store.NewManager(configDir)
-	cfg, _ := mgr.LoadBaseConfig()
-	cfg.Skills = append(cfg.Skills, internal.Skill{ID: "s1", Name: "my-skill", Path: skillPath})
-	mgr.SaveBaseConfig(cfg)
-
-	projectDir := t.TempDir()
-	os.MkdirAll(filepath.Join(projectDir, ".gemini", "skills"), 0755)
-
-	app.AddSkill(projectDir, "my-skill", "", []string{"gemini"}, false, false)
-	err := app.StopSkill(projectDir, "my-skill", []string{"gemini"}, false)
-	assert.NoError(t, err)
-}

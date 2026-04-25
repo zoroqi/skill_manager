@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/zoroqi/skill_manager/internal"
+	"github.com/zoroqi/skill_manager/internal/store"
 )
 
 var statusGlobal bool
@@ -23,71 +26,169 @@ var statusCmd = &cobra.Command{
 			return err
 		}
 
-		skillMap := make(map[string]string)
-		for _, s := range skills {
-			skillMap[s.ID] = s.Name
-		}
-		skillRegisterMap := make(map[string]string)
-		for _, s := range skills {
-			skillRegisterMap[s.ID] = s.RegistryName
-		}
-
 		cmd.Printf("Context: %s (%s)\n", ctxCfg.Scope, targetDir)
-		cmd.Println("------------------------------------------------------------")
+		cmd.Println("--------------------------------------------------------------------------------")
 
-		cmd.Println("Active Skills:")
-		if len(ctxCfg.ActiveSkills) == 0 {
-			cmd.Println("  (none)")
-		} else {
-			cmd.Printf("  %-20s %-20s %s\n", "Name", "Agents", "Register")
-			for _, usage := range ctxCfg.ActiveSkills {
-				if name, ok := skillMap[usage.ID]; ok {
-					cmd.Printf("  %-20s %-20s %s\n", name, strings.Join(usage.Agents, ","), skillRegisterMap[usage.ID])
-				} else {
-					cmd.Printf("  %-20s (missing from scanned library)\n", usage.ID)
-				}
-			}
+		// Gather information
+		skillMap := make(map[string]internal.Skill)
+		for _, s := range skills {
+			skillMap[s.ID] = s
 		}
 
-		cmd.Println("\nInactive Skills:")
-		if len(ctxCfg.InactiveSkills) == 0 {
-			cmd.Println("  (none)")
-		} else {
-			cmd.Printf("  %-20s %-20s %s\n", "Name", "Agents", "Register")
-			for _, usage := range ctxCfg.InactiveSkills {
-				if name, ok := skillMap[usage.ID]; ok {
-					cmd.Printf("  %-20s %-20s %s\n", name, strings.Join(usage.Agents, ","), skillRegisterMap[usage.ID])
-				} else {
-					cmd.Printf("  %-20s (missing from scanned library)\n", usage.ID)
-				}
-			}
-		}
-
-		groupsSkillsMap := make(map[string][]string)
+		groupMap := make(map[string]internal.Group)
 		for _, g := range groups {
-			groupsSkillsMap[g.Name] = append(groupsSkillsMap[g.Name], g.SkillIDs...)
+			groupMap[g.Name] = g
 		}
 
-		cmd.Println("\nGrouped Skills:")
-		if len(ctxCfg.ActiveGroups) == 0 {
-			cmd.Println("  (none)")
-		} else {
-			for _, usage := range ctxCfg.ActiveGroups {
-				agents := strings.Join(usage.Agents, ",")
-				if agents == "" {
-					agents = "(all)"
+		existingAgents := store.FindExistingAgents(targetDir)
+
+		// 1. Mark Inactive for exclusion from groups
+		inactive := make(map[string]map[string]bool)
+		for _, usage := range ctxCfg.InactiveSkills {
+			if inactive[usage.Name] == nil {
+				inactive[usage.Name] = make(map[string]bool)
+			}
+			if len(usage.Agents) == 0 {
+				inactive[usage.Name][""] = true
+			} else {
+				for _, a := range usage.Agents {
+					inactive[usage.Name][a] = true
 				}
-				cmd.Printf("Group: %s (Agents: %s)\n", usage.Name, agents)
-				cmd.Printf("  %-20s %-20s %s\n", "Name", "Agents", "Register")
-				if group, ok := groupsSkillsMap[usage.Name]; ok {
-					for _, id := range group {
-						if name, ok := skillMap[id]; ok {
-							cmd.Printf("  %-20s %-20s %s\n", name, strings.Join(usage.Agents, ","), skillRegisterMap[id])
-						} else {
-							cmd.Printf("  %-20s (missing from scanned library)\n", id)
-						}
+			}
+		}
+		isInactive := func(name, agent string) bool {
+			m := inactive[name]
+			if m == nil {
+				return false
+			}
+			return m[""] || m[agent]
+		}
+
+		// 2. Resolve final skills per agent to track effective state
+		// agent -> skillName -> effectiveSkillID
+		effectiveID := make(map[string]map[string]string)
+		
+		// agent -> skillID -> sources
+		idSources := make(map[string]map[string]map[string]bool)
+		
+		setEffective := func(agent, skillName, id, source string) {
+			if effectiveID[agent] == nil {
+				effectiveID[agent] = make(map[string]string)
+			}
+			if _, exists := effectiveID[agent][skillName]; !exists {
+				effectiveID[agent][skillName] = id
+			}
+			
+			// Only track source if this ID is the effective one for this name
+			if effectiveID[agent][skillName] == id {
+				if idSources[agent] == nil {
+					idSources[agent] = make(map[string]map[string]bool)
+				}
+				if idSources[agent][id] == nil {
+					idSources[agent][id] = make(map[string]bool)
+				}
+				idSources[agent][id][source] = true
+			}
+		}
+
+		// Process User Added (Highest priority)
+		for _, usage := range ctxCfg.ActiveSkills {
+			skill, ok := skillMap[usage.ID]
+			if !ok { continue }
+			agents := usage.Agents
+			if len(agents) == 0 { agents = existingAgents }
+			for _, a := range agents {
+				setEffective(a, skill.Name, skill.ID, "user")
+			}
+		}
+
+		// Process Groups (Lower priority, sorted)
+		sortedGroups := make([]internal.GroupUsage, len(ctxCfg.ActiveGroups))
+		copy(sortedGroups, ctxCfg.ActiveGroups)
+		sort.Slice(sortedGroups, func(i, j int) bool {
+			return sortedGroups[i].Name < sortedGroups[j].Name
+		})
+
+		for _, usage := range sortedGroups {
+			group, ok := groupMap[usage.Name]
+			if !ok { continue }
+			agents := usage.Agents
+			if len(agents) == 0 { agents = existingAgents }
+
+			for _, skillID := range group.SkillIDs {
+				skill, ok := skillMap[skillID]
+				if !ok { continue }
+				for _, a := range agents {
+					if isInactive(skill.Name, a) {
+						continue
+					}
+
+					setEffective(a, skill.Name, skillID, usage.Name)
+				}
+			}
+		}
+
+		// Consolidate for display: Group by SkillID
+		type displaySkill struct {
+			Skill   internal.Skill
+			Agents  map[string]bool
+			Sources map[string]bool
+		}
+		activeDisplay := make(map[string]*displaySkill)
+
+		for agent, skills := range effectiveID {
+			for _, id := range skills {
+				if activeDisplay[id] == nil {
+					activeDisplay[id] = &displaySkill{
+						Skill:   skillMap[id],
+						Agents:  make(map[string]bool),
+						Sources: make(map[string]bool),
 					}
 				}
+				activeDisplay[id].Agents[agent] = true
+				for s := range idSources[agent][id] {
+					activeDisplay[id].Sources[s] = true
+				}
+			}
+		}
+
+		// Sort by Name
+		var sortedIDs []string
+		for id := range activeDisplay {
+			sortedIDs = append(sortedIDs, id)
+		}
+		sort.Slice(sortedIDs, func(i, j int) bool {
+			return activeDisplay[sortedIDs[i]].Skill.Name < activeDisplay[sortedIDs[j]].Skill.Name
+		})
+
+		cmd.Printf("%-15s %-15s %-20s %s\n", "Name", "Register", "Agent", "source")
+		if len(sortedIDs) == 0 {
+			cmd.Println("  (no active skills)")
+		} else {
+			for _, id := range sortedIDs {
+				d := activeDisplay[id]
+				var agents []string
+				for a := range d.Agents {
+					agents = append(agents, a)
+				}
+				sort.Strings(agents)
+
+				var sources []string
+				for s := range d.Sources {
+					sources = append(sources, s)
+				}
+				sort.Strings(sources)
+
+				reg := d.Skill.RegistryName
+				if reg == "" {
+					reg = "local"
+				}
+
+				cmd.Printf("%-15s %-15s %-20s %s\n",
+					d.Skill.Name,
+					reg,
+					strings.Join(agents, "/"),
+					strings.Join(sources, ", "))
 			}
 		}
 

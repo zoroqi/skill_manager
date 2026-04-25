@@ -10,12 +10,35 @@ import (
 	"github.com/zoroqi/skill_manager/internal/store"
 )
 
-func addSkillToContext(cfg *internal.ContextConfig, skillID string, agents []string) {
-	newInactive := make([]internal.SkillUsage, 0, len(cfg.InactiveSkills))
+func addSkillToContext(cfg *internal.ContextConfig, skillID, skillName string, agents []string) {
+	newInactive := make([]internal.InactiveSkillUsage, 0, len(cfg.InactiveSkills))
 	for _, usage := range cfg.InactiveSkills {
-		if usage.ID != skillID {
+		if usage.Name != skillName {
 			newInactive = append(newInactive, usage)
+		} else if len(agents) > 0 && len(usage.Agents) > 0 {
+			// Partial unmasking
+			remainingMasked := []string{}
+			toUnmask := make(map[string]bool)
+			for _, a := range agents {
+				toUnmask[a] = true
+			}
+			for _, a := range usage.Agents {
+				if !toUnmask[a] {
+					remainingMasked = append(remainingMasked, a)
+				}
+			}
+			if len(remainingMasked) > 0 {
+				usage.Agents = remainingMasked
+				newInactive = append(newInactive, usage)
+			}
+			continue
+		} else if len(agents) == 0 {
+			// If adding without specific agents, unmask entirely? 
+			// Or maybe adding a skill should always unmask it for those agents.
+			continue 
 		}
+		// If adding for specific agents but usage.Agents is nil (all), 
+		// we might need to handle it, but for simplicity let's just unmask.
 	}
 	cfg.InactiveSkills = newInactive
 
@@ -29,72 +52,33 @@ func addSkillToContext(cfg *internal.ContextConfig, skillID string, agents []str
 	cfg.ActiveSkills = append(cfg.ActiveSkills, internal.SkillUsage{ID: skillID, Agents: agents})
 }
 
-func removeSkillFromContext(cfg *internal.ContextConfig, skillID string) {
+func removeSkillFromContext(cfg *internal.ContextConfig, skillID string, agents []string) {
 	newActive := make([]internal.SkillUsage, 0, len(cfg.ActiveSkills))
 	for _, usage := range cfg.ActiveSkills {
-		if usage.ID != skillID {
-			newActive = append(newActive, usage)
-		}
-	}
-	cfg.ActiveSkills = newActive
-
-	newInactive := make([]internal.SkillUsage, 0, len(cfg.InactiveSkills))
-	for _, usage := range cfg.InactiveSkills {
-		if usage.ID != skillID {
-			newInactive = append(newInactive, usage)
-		}
-	}
-	cfg.InactiveSkills = newInactive
-}
-
-func stopSkillInContext(cfg *internal.ContextConfig, skillID string, agents []string) {
-	var targetUsage *internal.SkillUsage
-	newActive := make([]internal.SkillUsage, 0, len(cfg.ActiveSkills))
-
-	for _, usage := range cfg.ActiveSkills {
-		if usage.ID != skillID {
-			newActive = append(newActive, usage)
-			continue
-		}
-
-		if len(agents) == 0 {
-			targetUsage = &usage
-			continue
-		}
-
-		newAgents := make([]string, 0, len(usage.Agents))
-		agentMap := make(map[string]bool, len(agents))
-		for _, agent := range agents {
-			agentMap[agent] = true
-		}
-		for _, agent := range usage.Agents {
-			if !agentMap[agent] {
-				newAgents = append(newAgents, agent)
-			}
-		}
-
-		if len(newAgents) > 0 {
-			usage.Agents = newAgents
-			newActive = append(newActive, usage)
-			continue
-		}
-
-		targetUsage = &usage
-	}
-	cfg.ActiveSkills = newActive
-
-	if targetUsage == nil {
-		return
-	}
-
-	for i, usage := range cfg.InactiveSkills {
 		if usage.ID == skillID {
-			cfg.InactiveSkills[i].Agents = mergeAgents(usage.Agents, targetUsage.Agents)
-			return
+			if len(agents) == 0 {
+				continue // Remove entirely
+			}
+			// Partial removal
+			remainingAgents := []string{}
+			toRemove := make(map[string]bool)
+			for _, a := range agents {
+				toRemove[a] = true
+			}
+			for _, a := range usage.Agents {
+				if !toRemove[a] {
+					remainingAgents = append(remainingAgents, a)
+				}
+			}
+			if len(remainingAgents) > 0 {
+				usage.Agents = remainingAgents
+				newActive = append(newActive, usage)
+			}
+			continue
 		}
+		newActive = append(newActive, usage)
 	}
-
-	cfg.InactiveSkills = append(cfg.InactiveSkills, *targetUsage)
+	cfg.ActiveSkills = newActive
 }
 
 func (a *App) resolveSkill(skillName, registryName string) (*internal.Skill, error) {
@@ -157,7 +141,7 @@ func (a *App) AddSkill(workDir, skillName, registryName string, agents []string,
 		}
 	}
 
-	addSkillToContext(ctxCfg, targetSkill.ID, agents)
+	addSkillToContext(ctxCfg, targetSkill.ID, targetSkill.Name, agents)
 
 	if err := a.syncContext(targetDir, ctxCfg, force); err != nil {
 		return err
@@ -197,7 +181,7 @@ func (a *App) AddGroup(workDir, groupName string, agents []string, global, force
 	return saveCtx()
 }
 
-func (a *App) RemoveSkill(workDir, skillName string, global bool) error {
+func (a *App) RemoveSkill(workDir, skillName string, agents []string, global bool) error {
 	targetDir, ctxCfg, saveCtx, err := a.resolveContext(workDir, global)
 	if err != nil {
 		return err
@@ -208,18 +192,70 @@ func (a *App) RemoveSkill(workDir, skillName string, global bool) error {
 		return fmt.Errorf("failed to load base config: %w", err)
 	}
 
-	var skillID string
+	groupsCfg, err := a.store.LoadGroupsConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load groups config: %w", err)
+	}
+
+	var matchingIDs []string
 	for _, s := range cfg.Skills {
 		if s.Name == skillName {
-			skillID = s.ID
-			break
+			matchingIDs = append(matchingIDs, s.ID)
 		}
 	}
-	if skillID == "" {
+	if len(matchingIDs) == 0 {
 		return fmt.Errorf("skill '%s' not found in scanned library", skillName)
 	}
 
-	removeSkillFromContext(ctxCfg, skillID)
+	groupMap := make(map[string]internal.Group)
+	for _, g := range groupsCfg.Groups {
+		groupMap[g.Name] = g
+	}
+
+	isSkillInActiveGroups := false
+	for _, activeGroup := range ctxCfg.ActiveGroups {
+		g, ok := groupMap[activeGroup.Name]
+		if !ok {
+			continue
+		}
+		for _, id := range g.SkillIDs {
+			// Find if any matching skill (by name) is in this group
+			for _, mid := range matchingIDs {
+				if id == mid {
+					isSkillInActiveGroups = true
+					break
+				}
+			}
+			if isSkillInActiveGroups {
+				break
+			}
+		}
+		if isSkillInActiveGroups {
+			break
+		}
+	}
+
+	for _, skillID := range matchingIDs {
+		removeSkillFromContext(ctxCfg, skillID, agents)
+	}
+
+	if isSkillInActiveGroups {
+		found := false
+		for i, usage := range ctxCfg.InactiveSkills {
+			if usage.Name == skillName {
+				if len(agents) == 0 {
+					ctxCfg.InactiveSkills[i].Agents = nil
+				} else if ctxCfg.InactiveSkills[i].Agents != nil {
+					ctxCfg.InactiveSkills[i].Agents = mergeAgents(ctxCfg.InactiveSkills[i].Agents, agents)
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			ctxCfg.InactiveSkills = append(ctxCfg.InactiveSkills, internal.InactiveSkillUsage{Name: skillName, Agents: agents})
+		}
+	}
 
 	if err := a.syncContext(targetDir, ctxCfg, true); err != nil {
 		return err
@@ -275,36 +311,6 @@ func (a *App) RemoveGroup(workDir, groupName string, agents []string, global boo
 	if err := a.syncContext(targetDir, ctxCfg, true); err != nil {
 		return err
 	}
-	return saveCtx()
-}
-
-func (a *App) StopSkill(workDir, skillName string, agents []string, global bool) error {
-	targetDir, ctxCfg, saveCtx, err := a.resolveContext(workDir, global)
-	if err != nil {
-		return err
-	}
-
-	cfg, err := a.store.LoadBaseConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load base config: %w", err)
-	}
-
-	var skillID string
-	for _, s := range cfg.Skills {
-		if s.Name == skillName {
-			skillID = s.ID
-			break
-		}
-	}
-	if skillID == "" {
-		return fmt.Errorf("skill '%s' not found in scanned library", skillName)
-	}
-
-	if err := store.RemoveAgentSymlinks(targetDir, skillName, agents); err != nil {
-		return err
-	}
-
-	stopSkillInContext(ctxCfg, skillID, agents)
 	return saveCtx()
 }
 

@@ -73,7 +73,7 @@ func (m *Manager) Init() error {
 		Version:        internal.CONFIG_VERSION,
 		Scope:          "global",
 		ActiveSkills:   []internal.SkillUsage{},
-		InactiveSkills: []internal.SkillUsage{},
+		InactiveSkills: []internal.InactiveSkillUsage{},
 		ActiveGroups:   []internal.GroupUsage{},
 	}
 	if err := m.SaveContextConfig(globalContext, internal.FILENAME_GLOBAL_CONTEXT); err != nil {
@@ -341,13 +341,15 @@ func EnsureLocalContext(targetDir string) (internal.ContextConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return internal.ContextConfig{
+			scope := filepath.Base(targetDir)
+			cfg = internal.ContextConfig{
 				Version:        internal.CONFIG_VERSION,
-				Scope:          "project",
+				Scope:          scope,
 				ActiveSkills:   []internal.SkillUsage{},
-				InactiveSkills: []internal.SkillUsage{},
+				InactiveSkills: []internal.InactiveSkillUsage{},
 				ActiveGroups:   []internal.GroupUsage{},
-			}, nil
+			}
+			return cfg, nil
 		}
 		return cfg, err
 	}

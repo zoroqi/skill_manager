@@ -107,12 +107,17 @@ func (g *GroupUsage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type InactiveSkillUsage struct {
+	Name   string   `json:"name"`
+	Agents []string `json:"agents"`
+}
+
 type ContextConfig struct {
-	Version        string       `json:"version"`
-	Scope          string       `json:"scope"`
-	ActiveSkills   []SkillUsage `json:"active_skills"`
-	InactiveSkills []SkillUsage `json:"inactive_skills,omitempty"`
-	ActiveGroups   []GroupUsage `json:"active_groups"`
+	Version        string               `json:"version"`
+	Scope          string               `json:"scope"`
+	ActiveSkills   []SkillUsage         `json:"active_skills"`
+	InactiveSkills []InactiveSkillUsage `json:"inactive_skills,omitempty"`
+	ActiveGroups   []GroupUsage         `json:"active_groups"`
 }
 
 type ContextSummary struct {

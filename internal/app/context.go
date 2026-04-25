@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/zoroqi/skill_manager/internal"
 	"github.com/zoroqi/skill_manager/internal/store"
@@ -30,13 +31,61 @@ func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, forc
 		groupMap[group.Name] = group
 	}
 
-	desiredSkills := make(map[string][]string)
-	for _, usage := range ctxCfg.ActiveSkills {
-		desiredSkills[usage.ID] = mergeAgents(desiredSkills[usage.ID], usage.Agents)
+	existingAgents := store.FindExistingAgents(targetDir)
+
+	// 1. Process InactiveSkills for lookup
+	inactive := make(map[string]map[string]bool) // skillName -> agent -> true
+	for _, usage := range ctxCfg.InactiveSkills {
+		if inactive[usage.Name] == nil {
+			inactive[usage.Name] = make(map[string]bool)
+		}
+		if len(usage.Agents) == 0 {
+			inactive[usage.Name][""] = true // "" means all agents
+		} else {
+			for _, agent := range usage.Agents {
+				inactive[usage.Name][agent] = true
+			}
+		}
 	}
 
-	existingAgents := store.FindExistingAgents(targetDir)
-	for _, usage := range ctxCfg.ActiveGroups {
+	isInactive := func(skillName, agent string) bool {
+		m := inactive[skillName]
+		if m == nil {
+			return false
+		}
+		return m[""] || m[agent]
+	}
+
+	// 2. Resolve final skills per agent
+	// agent -> skillName -> skillPath
+	agentToSkillPaths := make(map[string]map[string]string)
+
+	// User-added skills (ActiveSkills) have highest priority
+	for _, usage := range ctxCfg.ActiveSkills {
+		skill, ok := skillMap[usage.ID]
+		if !ok {
+			continue
+		}
+		agents := usage.Agents
+		if len(agents) == 0 {
+			agents = existingAgents
+		}
+		for _, agent := range agents {
+			if agentToSkillPaths[agent] == nil {
+				agentToSkillPaths[agent] = make(map[string]string)
+			}
+			agentToSkillPaths[agent][skill.Name] = skill.Path
+		}
+	}
+
+	// Process ActiveGroups with priority (alphabetical order)
+	sortedGroups := make([]internal.GroupUsage, len(ctxCfg.ActiveGroups))
+	copy(sortedGroups, ctxCfg.ActiveGroups)
+	sort.Slice(sortedGroups, func(i, j int) bool {
+		return sortedGroups[i].Name < sortedGroups[j].Name
+	})
+
+	for _, usage := range sortedGroups {
 		group, ok := groupMap[usage.Name]
 		if !ok {
 			continue
@@ -45,22 +94,27 @@ func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, forc
 		if len(agents) == 0 {
 			agents = existingAgents
 		}
-		for _, skillID := range group.SkillIDs {
-			desiredSkills[skillID] = mergeAgents(desiredSkills[skillID], agents)
-		}
-	}
 
-	agentToSkills := make(map[string]map[string]string)
-	for skillID, agents := range desiredSkills {
-		skill, ok := skillMap[skillID]
-		if !ok {
-			continue
-		}
-		for _, agent := range agents {
-			if agentToSkills[agent] == nil {
-				agentToSkills[agent] = make(map[string]string)
+		for _, skillID := range group.SkillIDs {
+			skill, ok := skillMap[skillID]
+			if !ok {
+				continue
 			}
-			agentToSkills[agent][skill.Name] = skill.Path
+
+			for _, agent := range agents {
+				if isInactive(skill.Name, agent) {
+					continue
+				}
+
+				if agentToSkillPaths[agent] == nil {
+					agentToSkillPaths[agent] = make(map[string]string)
+				}
+
+				// Only add if not already set by higher priority source
+				if _, exists := agentToSkillPaths[agent][skill.Name]; !exists {
+					agentToSkillPaths[agent][skill.Name] = skill.Path
+				}
+			}
 		}
 	}
 
@@ -68,12 +122,12 @@ func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, forc
 	for _, agent := range existingAgents {
 		allAgents[agent] = true
 	}
-	for agent := range agentToSkills {
+	for agent := range agentToSkillPaths {
 		allAgents[agent] = true
 	}
 
 	for agent := range allAgents {
-		skills := agentToSkills[agent]
+		skills := agentToSkillPaths[agent]
 		if skills == nil {
 			skills = make(map[string]string)
 		}
