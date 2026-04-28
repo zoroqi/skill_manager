@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "scope": "skill_manager",
+  "active_skills": [],
+  "active_groups": [
+    {
+      "name": "golang",
+      "agents": [
+        "gemini"
+      ]
+    }
+  ]
+}

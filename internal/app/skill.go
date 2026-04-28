@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/zoroqi/skill_manager/internal"
@@ -33,11 +34,11 @@ func addSkillToContext(cfg *internal.ContextConfig, skillID, skillName string, a
 			}
 			continue
 		} else if len(agents) == 0 {
-			// If adding without specific agents, unmask entirely? 
+			// If adding without specific agents, unmask entirely?
 			// Or maybe adding a skill should always unmask it for those agents.
-			continue 
+			continue
 		}
-		// If adding for specific agents but usage.Agents is nil (all), 
+		// If adding for specific agents but usage.Agents is nil (all),
 		// we might need to handle it, but for simplicity let's just unmask.
 	}
 	cfg.InactiveSkills = newInactive
@@ -143,7 +144,7 @@ func (a *App) AddSkill(workDir, skillName, registryName string, agents []string,
 
 	addSkillToContext(ctxCfg, targetSkill.ID, targetSkill.Name, agents)
 
-	if err := a.syncContext(targetDir, ctxCfg, force); err != nil {
+	if err := a.syncContext(targetDir, ctxCfg, force, global); err != nil {
 		return err
 	}
 	return saveCtx()
@@ -175,7 +176,7 @@ func (a *App) AddGroup(workDir, groupName string, agents []string, global, force
 		ctxCfg.ActiveGroups = append(ctxCfg.ActiveGroups, internal.GroupUsage{Name: groupName, Agents: agents})
 	}
 
-	if err := a.syncContext(targetDir, ctxCfg, force); err != nil {
+	if err := a.syncContext(targetDir, ctxCfg, force, global); err != nil {
 		return err
 	}
 	return saveCtx()
@@ -220,11 +221,8 @@ func (a *App) RemoveSkill(workDir, skillName string, agents []string, global boo
 		}
 		for _, id := range g.SkillIDs {
 			// Find if any matching skill (by name) is in this group
-			for _, mid := range matchingIDs {
-				if id == mid {
-					isSkillInActiveGroups = true
-					break
-				}
+			if slices.Contains(matchingIDs, id) {
+				isSkillInActiveGroups = true
 			}
 			if isSkillInActiveGroups {
 				break
@@ -257,7 +255,7 @@ func (a *App) RemoveSkill(workDir, skillName string, agents []string, global boo
 		}
 	}
 
-	if err := a.syncContext(targetDir, ctxCfg, true); err != nil {
+	if err := a.syncContext(targetDir, ctxCfg, true, global); err != nil {
 		return err
 	}
 	return saveCtx()
@@ -308,7 +306,7 @@ func (a *App) RemoveGroup(workDir, groupName string, agents []string, global boo
 	}
 	ctxCfg.ActiveGroups = newGroups
 
-	if err := a.syncContext(targetDir, ctxCfg, true); err != nil {
+	if err := a.syncContext(targetDir, ctxCfg, true, global); err != nil {
 		return err
 	}
 	return saveCtx()

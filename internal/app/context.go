@@ -10,7 +10,7 @@ import (
 	"github.com/zoroqi/skill_manager/internal/store"
 )
 
-func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, force bool) error {
+func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, force, global bool) error {
 	baseCfg, err := a.store.LoadBaseConfig()
 	if err != nil {
 		return err
@@ -126,10 +126,15 @@ func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, forc
 		allAgents[agent] = true
 	}
 
+	var activeAgentDirs []string
 	for agent := range allAgents {
 		skills := agentToSkillPaths[agent]
 		if skills == nil {
 			skills = make(map[string]string)
+		}
+
+		if len(skills) > 0 {
+			activeAgentDirs = append(activeAgentDirs, agent)
 		}
 
 		skillsDir, err := store.EnsureAgentSkillsDir(targetDir, agent)
@@ -178,11 +183,27 @@ func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, forc
 			if err != nil {
 				continue
 			}
+
 			if info.Mode()&os.ModeSymlink != 0 {
 				if err := os.Remove(orphanPath); err != nil {
 					return fmt.Errorf("failed to remove orphan symlink %s: %w", orphanPath, err)
 				}
 			}
+		}
+	}
+
+	// Update .gitignore if not global
+	if !global {
+		var ignorePaths []string
+		for agent, skills := range agentToSkillPaths {
+			agentDir := store.GetAgentDir(agent)
+			for skillName := range skills {
+				ignorePaths = append(ignorePaths, fmt.Sprintf("%s/skills/%s", agentDir, skillName))
+			}
+		}
+		sort.Strings(ignorePaths)
+		if err := updateGitignore(targetDir, ignorePaths); err != nil {
+			return fmt.Errorf("failed to update .gitignore: %w", err)
 		}
 	}
 
@@ -194,7 +215,7 @@ func (a *App) SyncContext(workDir string, global, force bool) error {
 	if err != nil {
 		return err
 	}
-	return a.syncContext(targetDir, ctxCfg, force)
+	return a.syncContext(targetDir, ctxCfg, force, global)
 }
 
 func (a *App) GetStatus(workDir string, global bool) (internal.ContextConfig, []internal.Skill, []internal.Group, error) {

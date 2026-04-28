@@ -1,3 +1,9 @@
 skill_manager
 skill_manger.exe
 .sisyphus
+
+# BEGIN skill_manager managed
+.gemini/skills/golang-patterns
+.gemini/skills/golang-pro
+.gemini/skills/golang-testing
+# END skill_manager managed

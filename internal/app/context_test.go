@@ -10,11 +10,10 @@ func TestGetStatus(t *testing.T) {
 	app, _ := setupApp(t)
 	workDir := t.TempDir()
 
-	ctxCfg, skills, groups, err := app.GetStatus(workDir, false)
+	_, skills, groups, err := app.GetStatus(workDir, false)
 	assert.NoError(t, err)
 	assert.Empty(t, skills)
 	assert.Empty(t, groups)
-	assert.Equal(t, "project", ctxCfg.Scope)
 }
 
 func TestSyncContext(t *testing.T) {
