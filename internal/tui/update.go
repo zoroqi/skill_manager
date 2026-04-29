@@ -2,6 +2,7 @@ package tui
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -19,6 +20,7 @@ type dataLoadedMsg struct {
 	globalSkills  []ResolvedSkill
 	registerItems []RegisterItem
 	groupItems    []GroupItem
+	status        string
 }
 
 type errMsg struct{ err error }
@@ -26,10 +28,10 @@ type errMsg struct{ err error }
 func (e errMsg) Error() string { return e.err.Error() }
 
 func (m Model) Init() tea.Cmd {
-	return m.loadData()
+	return m.loadData("")
 }
 
-func (m Model) loadData() tea.Cmd {
+func (m Model) loadData(status string) tea.Cmd {
 	return func() tea.Msg {
 		cwd, _ := os.Getwd()
 
@@ -69,10 +71,12 @@ func (m Model) loadData() tea.Cmd {
 
 		var grpItems []GroupItem
 		for _, g := range groupsCfg.Groups {
+			groupCopy := g
 			grpItems = append(grpItems, GroupItem{
 				IsGroup: true,
 				Name:    g.Name,
 				Summary: g.Description,
+				Group:   &groupCopy,
 			})
 			for _, sid := range g.SkillIDs {
 				for _, s := range allSkills {
@@ -94,6 +98,7 @@ func (m Model) loadData() tea.Cmd {
 			globalSkills:  gResolved,
 			registerItems: items,
 			groupItems:    grpItems,
+			status:        status,
 		}
 	}
 }
@@ -321,6 +326,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.state = DashboardView
 				m.selectedSkill = nil
+				m.selectedGroup = nil
 				m.err = nil
 				return m, nil
 			case "p", "P":
@@ -332,6 +338,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.formInputs[1].SetValue(m.selectedSkill.RegistryName)
 					}
 					return m, nil
+				} else if m.selectedGroup != nil {
+					m.active = ProjectPanel
+					m.setupForm()
+					m.formInputs[0].SetValue(m.selectedGroup.Name)
+					return m, nil
 				}
 			case "g", "G":
 				if m.selectedSkill != nil {
@@ -341,6 +352,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if len(m.formInputs) > 1 {
 						m.formInputs[1].SetValue(m.selectedSkill.RegistryName)
 					}
+					return m, nil
+				} else if m.selectedGroup != nil {
+					m.active = GlobalPanel
+					m.setupForm()
+					m.formInputs[0].SetValue(m.selectedGroup.Name)
 					return m, nil
 				}
 			}
@@ -376,8 +392,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					} else if m.active == GroupPanel {
 						if item, ok := m.groupList.SelectedItem().(GroupItem); ok {
-							if !item.IsGroup && item.Skill != nil {
-								m.showDetailView(item.Skill)
+							if item.IsGroup && item.Group != nil {
+								m.showGroupDetailView(item.Group)
 								return m, nil
 							}
 						}
@@ -406,6 +422,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.globalSkills = msg.globalSkills
 		m.registerItems = msg.registerItems
 		m.groupItems = msg.groupItems
+		m.statusMsg = msg.status
 
 		m.projectList.SetItems(toItems(m.projectSkills))
 		m.globalList.SetItems(toItems(m.globalSkills))
@@ -414,6 +431,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.updateActiveListStyle()
 		m.state = DashboardView
+		m.selectedSkill = nil
+		m.selectedGroup = nil
+		m.err = nil
 
 	case errMsg:
 		m.err = msg.err
@@ -454,6 +474,23 @@ func (m Model) isFiltering() bool {
 func (m *Model) showDetailView(skill *internal.Skill) {
 	b, _ := json.MarshalIndent(skill, "", "  ")
 	m.selectedSkill = skill
+	m.selectedGroup = nil
+	m.err = nil
+
+	m.detailViewport = viewport.New(m.width-4, m.height-6)
+	m.detailViewport.Style = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		PaddingRight(2)
+	m.detailViewport.SetContent(string(b))
+
+	m.state = DetailView
+}
+
+func (m *Model) showGroupDetailView(group *internal.Group) {
+	b, _ := json.MarshalIndent(group, "", "  ")
+	m.selectedGroup = group
+	m.selectedSkill = nil
 	m.err = nil
 
 	m.detailViewport = viewport.New(m.width-4, m.height-6)
@@ -505,11 +542,14 @@ func (m Model) submitForm() tea.Cmd {
 		}
 
 		var err error
+		var successMsg string
 		switch m.active {
 		case RegisterPanel:
 			err = m.app.RegisterAdd(val(1), val(0), "")
+			successMsg = "Registry added successfully"
 		case GroupPanel:
 			err = m.app.CreateGroup(val(0), val(1))
+			successMsg = "Group created successfully"
 		case ProjectPanel, GlobalPanel:
 			global := m.active == GlobalPanel
 			cwd, _ := os.Getwd()
@@ -532,19 +572,25 @@ func (m Model) submitForm() tea.Cmd {
 			if err != nil {
 				// try group
 				err = m.app.AddGroup(cwd, name, agents, global, false)
+				if err == nil {
+					successMsg = fmt.Sprintf("Group '%s' added successfully", name)
+				}
+			} else {
+				successMsg = fmt.Sprintf("Skill '%s' added successfully", name)
 			}
 		}
 
 		if err != nil {
 			return errMsg{err}
 		}
-		return m.loadData()
+		return m.loadData(successMsg)()
 	}
 }
 
 func (m Model) deleteSelected() tea.Cmd {
 	return func() tea.Msg {
 		var err error
+		var successMsg string
 		cwd, _ := os.Getwd()
 
 		switch m.active {
@@ -552,28 +598,32 @@ func (m Model) deleteSelected() tea.Cmd {
 			if item, ok := m.registerList.SelectedItem().(RegisterItem); ok {
 				if item.IsRegistry {
 					err = m.app.RegisterRemove(item.Name, false)
+					successMsg = fmt.Sprintf("Registry '%s' removed", item.Name)
 				}
 			}
 		case GroupPanel:
 			if item, ok := m.groupList.SelectedItem().(GroupItem); ok {
 				if item.IsGroup {
 					err = m.app.DeleteGroup(item.Name)
+					successMsg = fmt.Sprintf("Group '%s' deleted", item.Name)
 				}
 			}
 		case ProjectPanel:
 			if item, ok := m.projectList.SelectedItem().(ResolvedSkill); ok {
 				err = m.app.RemoveSkill(cwd, item.ID, nil, false)
+				successMsg = fmt.Sprintf("Skill '%s' removed from project", item.ID)
 			}
 		case GlobalPanel:
 			if item, ok := m.globalList.SelectedItem().(ResolvedSkill); ok {
 				err = m.app.RemoveSkill(cwd, item.ID, nil, true)
+				successMsg = fmt.Sprintf("Skill '%s' removed from global", item.ID)
 			}
 		}
 
 		if err != nil {
 			return errMsg{err}
 		}
-		return m.loadData()
+		return m.loadData(successMsg)()
 	}
 }
 

@@ -71,7 +71,20 @@ func (m Model) dashboardView() string {
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, topL, topR)
 	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, botL, botR)
 
-	return lipgloss.JoinVertical(lipgloss.Bottom, topRow, bottomRow)
+	dashboard := lipgloss.JoinVertical(lipgloss.Bottom, topRow, bottomRow)
+
+	help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingLeft(2).Render(
+		"tab: switch panel • a: add • d: remove • enter: detail • q: quit",
+	)
+
+	content := lipgloss.JoinVertical(lipgloss.Left, dashboard, help)
+
+	if m.statusMsg != "" {
+		status := greenStyle.Bold(true).Padding(0, 1).Render(m.statusMsg)
+		return lipgloss.JoinVertical(lipgloss.Left, content, status)
+	}
+
+	return content
 }
 
 func (m Model) formView() string {
@@ -91,7 +104,14 @@ func (m Model) formView() string {
 }
 
 func (m Model) detailView() string {
-	title := boldStyle.Render("Skill Details: " + m.selectedSkill.Name)
+	var title string
+	if m.selectedSkill != nil {
+		title = boldStyle.Render("Skill Details: " + m.selectedSkill.Name)
+	} else if m.selectedGroup != nil {
+		title = boldStyle.Render("Group Details: " + m.selectedGroup.Name)
+	} else {
+		title = boldStyle.Render("Details")
+	}
 
 	// Operation box style
 	opStyle := lipgloss.NewStyle().

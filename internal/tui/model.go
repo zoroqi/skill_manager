@@ -45,6 +45,7 @@ type GroupItem struct {
 	Name    string
 	Summary string
 	Skill   *internal.Skill
+	Group   *internal.Group
 }
 
 type Model struct {
@@ -71,10 +72,12 @@ type Model struct {
 	formInputs []textinput.Model
 	formFocus  int
 	err        error
+	statusMsg  string
 
 	// Detail View State
 	detailViewport viewport.Model
 	selectedSkill  *internal.Skill
+	selectedGroup  *internal.Group
 }
 
 func NewModel(a *app.App) Model {
