@@ -2,14 +2,24 @@ package tui
 
 import (
 	"fmt"
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/lipgloss"
 	"strings"
 )
 
-const (
-	ColorReset  = "\033[0m"
-	ColorGreen  = "\033[32m"
-	ColorBold   = "\033[1m"
-	ColorSelect = "\033[7m"
+var (
+	boldStyle   = lipgloss.NewStyle().Bold(true)
+	greenStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	activeStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("2"))
+	inactiveStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("240"))
+	headerStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("7")). // White for better visibility
+			Bold(true).
+			PaddingLeft(4)
 )
 
 func (m Model) View() string {
@@ -27,216 +37,92 @@ func (m Model) View() string {
 }
 
 func (m Model) dashboardView() string {
-	var b strings.Builder
-
-	dashboardH := m.height
-	if m.searchMode || m.searchQuery != "" {
-		dashboardH--
-	}
-
+	// Account for borders and headers
 	halfW := m.width / 2
-	halfH := dashboardH / 2
+	halfH := m.height / 2
+	m.projectList.SetSize(halfW, halfH)
+	m.registerList.SetSize(halfW, halfH)
+	m.globalList.SetSize(halfW, halfH-8)
+	m.groupList.SetSize(halfW, halfH-8)
 
-	// Render Top Row
-	topL := m.renderPanel(ProjectPanel, halfW, halfH)
-	topR := m.renderPanel(RegisterPanel, m.width-halfW, halfH)
+	renderPanel := func(p Panel, l list.Model, header string) string {
+		style := inactiveStyle
+		if m.active == p {
+			style = activeStyle
+		}
 
-	// Render Bottom Row
-	botL := m.renderPanel(GlobalPanel, halfW, dashboardH-halfH)
-	botR := m.renderPanel(GroupPanel, m.width-halfW, dashboardH-halfH)
+		// Create a custom header area: List Title + Column Header
+		titleStr := boldStyle.PaddingLeft(2).Render(l.Title)
+		colHeaderStr := headerStyle.Render(header)
 
-	// Combine rows
-	topLines := strings.Split(topL, "\n")
-	rightLines := strings.Split(topR, "\n")
-	for i := 0; i < halfH && i < len(topLines) && i < len(rightLines); i++ {
-		b.WriteString(topLines[i])
-		b.WriteString(rightLines[i])
-		b.WriteString("\n")
+		content := lipgloss.JoinVertical(lipgloss.Left, titleStr, colHeaderStr, l.View())
+
+		return style.Width(halfW).Height(halfH - 8).Render(content)
 	}
 
-	botLines := strings.Split(botL, "\n")
-	botRightLines := strings.Split(botR, "\n")
-	for i := 0; i < (dashboardH-halfH) && i < len(botLines) && i < len(botRightLines); i++ {
-		b.WriteString(botLines[i])
-		b.WriteString(botRightLines[i])
-		b.WriteString("\n")
-	}
+	projectHeader := fmt.Sprintf(SkillHeaderFormat, "Name", "Register", "Agent", "Source")
+	registerHeader := fmt.Sprintf(RegisterHeaderFormat, "Name", "skill_name")
 
-	if m.searchMode || m.searchQuery != "" {
-		searchPrompt := "/" + m.searchQuery
-		if m.searchMode {
-			searchPrompt += "█"
-		}
-		b.WriteString(ColorGreen + searchPrompt + ColorReset)
-	}
+	topL := renderPanel(ProjectPanel, m.projectList, projectHeader)
+	topR := renderPanel(RegisterPanel, m.registerList, registerHeader)
+	botL := renderPanel(GlobalPanel, m.globalList, projectHeader)
+	botR := renderPanel(GroupPanel, m.groupList, registerHeader)
 
-	return b.String()
-}
+	topRow := lipgloss.JoinHorizontal(lipgloss.Top, topL, topR)
+	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, botL, botR)
 
-type renderItem struct {
-	text     string
-	selected bool
-}
-
-func (m Model) renderPanel(p Panel, w, h int) string {
-	var title string
-	var header string
-	var items []renderItem
-	idx := m.selectedRow[p]
-
-	switch p {
-	case ProjectPanel:
-		title = " Project Skills "
-		header = fmt.Sprintf("%-30s %-20s %-20s %s", "Name", "Register", "Agent", "source")
-		for i, s := range m.projectSkills {
-			items = append(items, renderItem{
-				text:     fmt.Sprintf("%-30s %-20s %-20s %s", truncate(s.ID, 30), truncate(s.Register, 20), truncate(s.Agents, 20), truncate(s.Source, 20)),
-				selected: i == idx,
-			})
-		}
-	case GlobalPanel:
-		title = " Global Skills "
-		header = fmt.Sprintf("%-30s %-20s %-20s %s", "Name", "Register", "Agent", "source")
-		for i, s := range m.globalSkills {
-			items = append(items, renderItem{
-				text:     fmt.Sprintf("%-30s %-20s %-20s %s", truncate(s.ID, 30), truncate(s.Register, 20), truncate(s.Agents, 20), truncate(s.Source, 20)),
-				selected: i == idx,
-			})
-		}
-	case RegisterPanel:
-		title = " Registries "
-		// search query is now at the bottom
-		header = fmt.Sprintf("%-20s %s", "Name", "skill_name")
-		for i, item := range m.filteredItems {
-			if item.IsRegistry {
-				items = append(items, renderItem{
-					text:     fmt.Sprintf("%-30s %s", truncate(item.Name, 30), truncate(item.URL, w)),
-					selected: i == idx,
-				})
-			} else {
-				items = append(items, renderItem{
-					text:     fmt.Sprintf("%-30s %s", "", truncate(item.Name, w)),
-					selected: i == idx,
-				})
-			}
-		}
-	case GroupPanel:
-		title = " Groups "
-		header = fmt.Sprintf("%-30s %s", "Name", "skill_name")
-		for i, item := range m.filteredGroupItems {
-			if item.IsGroup {
-				items = append(items, renderItem{
-					text:     fmt.Sprintf("%-30s %s", truncate(item.Name, 30), truncate(item.Description, w)),
-					selected: i == idx,
-				})
-			} else {
-				items = append(items, renderItem{
-					text:     fmt.Sprintf("%-30s %s", "", truncate(item.Name, w)),
-					selected: i == idx,
-				})
-			}
-		}
-	}
-
-	borderColor := ColorReset
-	if m.active == p {
-		borderColor = ColorGreen
-	}
-
-	var res strings.Builder
-	// Top border
-	res.WriteString(borderColor + "┌" + title)
-	res.WriteString(strings.Repeat("─", w-len(title)-2) + "┐" + ColorReset)
-	res.WriteString("\n")
-
-	// Header
-	res.WriteString(borderColor + "│" + ColorReset)
-	res.WriteString(ColorBold + truncate(header, w-2) + ColorReset)
-	res.WriteString(strings.Repeat(" ", w-2-len(truncate(header, w-2))))
-	res.WriteString(borderColor + "│" + ColorReset)
-	res.WriteString("\n")
-
-	// Separator
-	res.WriteString(borderColor + "│" + strings.Repeat("┄", w-2) + "│" + ColorReset + "\n")
-
-	// Content
-	viewHeight := h - 4
-	startIdx := 0
-
-	// Better auto-scrolling logic: keep cursor around the middle
-	if viewHeight > 0 && len(items) > viewHeight {
-		halfView := viewHeight / 2
-		if idx > halfView {
-			startIdx = idx - halfView
-		}
-		// Prevent scrolling past the bottom
-		if startIdx+viewHeight > len(items) {
-			startIdx = len(items) - viewHeight
-		}
-	}
-
-	for i := range viewHeight {
-		res.WriteString(borderColor + "│" + ColorReset)
-		content := ""
-		itemIdx := startIdx + i
-		if itemIdx < len(items) {
-			item := items[itemIdx]
-			displayLine := truncate(item.text, w-2)
-			if item.selected && m.active == p {
-				content = ColorSelect + displayLine + strings.Repeat(" ", w-2-len(displayLine)) + ColorReset
-			} else {
-				content = displayLine + strings.Repeat(" ", w-2-len(displayLine))
-			}
-		} else {
-			content = strings.Repeat(" ", w-2)
-		}
-		res.WriteString(content)
-		res.WriteString(borderColor + "│" + ColorReset)
-		res.WriteString("\n")
-	}
-
-	// Bottom border
-	res.WriteString(borderColor + "└" + strings.Repeat("─", w-2) + "┘" + ColorReset)
-
-	return res.String()
-}
-
-func truncate(s string, w int) string {
-	if len(s) > w {
-		return s[:w-3] + "..."
-	}
-	return s
+	return lipgloss.JoinVertical(lipgloss.Bottom, topRow, bottomRow)
 }
 
 func (m Model) formView() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("\n  %s%s%s\n\n", ColorBold, m.formTitle, ColorReset))
+	b.WriteString(fmt.Sprintf("\n  %s\n\n", boldStyle.Render(m.formTitle)))
 
-	for i, field := range m.formFields {
-		cursor := "  "
-		if i == m.formFocus {
-			cursor = ColorGreen + "> " + ColorReset
-		}
-		b.WriteString(fmt.Sprintf("%s%s: %s\n", cursor, field, m.formValues[i]))
+	for i := range m.formInputs {
+		b.WriteString("  " + m.formInputs[i].View() + "\n")
 	}
 
-	b.WriteString("\n  (Enter to submit, Esc to cancel, Backspace to delete)\n")
+	b.WriteString("\n  (Enter to next/submit, Esc to cancel)\n")
 	if m.err != nil {
-		b.WriteString(fmt.Sprintf("\n  %sError: %v%s\n", ColorGreen, m.err, ColorReset))
+		b.WriteString(fmt.Sprintf("\n  Error: %v\n", m.err))
 	}
 
 	return b.String()
 }
 
 func (m Model) detailView() string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("\n  %sSkill Details%s\n\n", ColorBold, ColorReset))
+	title := boldStyle.Render("Skill Details: " + m.selectedSkill.Name)
 
-	lines := strings.SplitSeq(m.detailContent, "\n")
-	for line := range lines {
-		b.WriteString(fmt.Sprintf("  %s\n", line))
+	// Operation box style
+	opStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("2")).
+		Padding(0, 1).
+		MarginTop(1)
+
+	ops := lipgloss.JoinHorizontal(lipgloss.Top,
+		greenStyle.Render("[P]"), " Add to Project  ",
+		greenStyle.Render("[G]"), " Add to Global   ",
+		greenStyle.Render("[Esc]"), " Back",
+	)
+
+	opBox := opStyle.Render(
+		lipgloss.JoinVertical(lipgloss.Left,
+			boldStyle.Render("Operations:"),
+			ops,
+		),
+	)
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		m.detailViewport.View(),
+		opBox,
+	)
+
+	if m.err != nil {
+		errorMsg := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render(fmt.Sprintf("Error: %v", m.err))
+		content = lipgloss.JoinVertical(lipgloss.Left, content, errorMsg)
 	}
 
-	b.WriteString("\n  (Esc to close)\n")
-	return b.String()
+	return lipgloss.NewStyle().Padding(1, 2).Render(content)
 }

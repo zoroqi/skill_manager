@@ -2,7 +2,11 @@ package tui
 
 import (
 	"encoding/json"
-	"github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/zoroqi/skill_manager/internal"
 	"github.com/zoroqi/skill_manager/internal/store"
 	"os"
@@ -66,9 +70,9 @@ func (m Model) loadData() tea.Cmd {
 		var grpItems []GroupItem
 		for _, g := range groupsCfg.Groups {
 			grpItems = append(grpItems, GroupItem{
-				IsGroup:     true,
-				Name:        g.Name,
-				Description: g.Description,
+				IsGroup: true,
+				Name:    g.Name,
+				Summary: g.Description,
 			})
 			for _, sid := range g.SkillIDs {
 				for _, s := range allSkills {
@@ -254,169 +258,130 @@ func (m Model) resolveStatus(dir string, ctxCfg internal.ContextConfig, skills [
 	return result
 }
 
-func (m *Model) filterRegisterItems() {
-	m.filteredItems = nil
-	m.selectedRow[RegisterPanel] = 0
-	if m.searchQuery == "" {
-		m.filteredItems = append(m.filteredItems, m.registerItems...)
-		return
-	}
-
-	query := strings.ToLower(m.searchQuery)
-	for _, item := range m.registerItems {
-		if strings.Contains(strings.ToLower(item.Name), query) {
-			m.filteredItems = append(m.filteredItems, item)
-		}
-	}
-}
-
-func (m *Model) filterGroupItems() {
-	m.filteredGroupItems = nil
-	m.selectedRow[GroupPanel] = 0
-	if m.searchQuery == "" {
-		m.filteredGroupItems = append(m.filteredGroupItems, m.groupItems...)
-		return
-	}
-
-	query := strings.ToLower(m.searchQuery)
-	for _, item := range m.groupItems {
-		if strings.Contains(strings.ToLower(item.Name), query) {
-			m.filteredGroupItems = append(m.filteredGroupItems, item)
-		}
-	}
-}
-
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.searchMode {
+		if m.state == FormView {
 			switch msg.String() {
 			case "esc":
-				m.searchMode = false
-				m.searchQuery = ""
-				if m.active == RegisterPanel {
-					m.filterRegisterItems()
-				} else if m.active == GroupPanel {
-					m.filterGroupItems()
+				m.state = DashboardView
+				return m, nil
+			case "up", "shift+tab":
+				m.formFocus--
+				if m.formFocus < 0 {
+					m.formFocus = len(m.formInputs) - 1
 				}
+				cmds := make([]tea.Cmd, len(m.formInputs))
+				for i := range m.formInputs {
+					if i == m.formFocus {
+						cmds[i] = m.formInputs[i].Focus()
+					} else {
+						m.formInputs[i].Blur()
+					}
+				}
+				return m, tea.Batch(cmds...)
+			case "down", "tab":
+				m.formFocus++
+				if m.formFocus >= len(m.formInputs) {
+					m.formFocus = 0
+				}
+				cmds := make([]tea.Cmd, len(m.formInputs))
+				for i := range m.formInputs {
+					if i == m.formFocus {
+						cmds[i] = m.formInputs[i].Focus()
+					} else {
+						m.formInputs[i].Blur()
+					}
+				}
+				return m, tea.Batch(cmds...)
 			case "enter":
-				m.searchMode = false
-			case "backspace":
-				if len(m.searchQuery) > 0 {
-					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
-					if m.active == RegisterPanel {
-						m.filterRegisterItems()
-					} else if m.active == GroupPanel {
-						m.filterGroupItems()
+				if m.formFocus == len(m.formInputs)-1 {
+					return m, m.submitForm()
+				}
+				m.formFocus++
+				cmds := make([]tea.Cmd, len(m.formInputs))
+				for i := range m.formInputs {
+					if i == m.formFocus {
+						cmds[i] = m.formInputs[i].Focus()
+					} else {
+						m.formInputs[i].Blur()
 					}
 				}
-			default:
-				if len(msg.String()) == 1 {
-					m.searchQuery += msg.String()
-					if m.active == RegisterPanel {
-						m.filterRegisterItems()
-					} else if m.active == GroupPanel {
-						m.filterGroupItems()
-					}
-				}
+				return m, tea.Batch(cmds...)
 			}
-			return m, nil
+
+			var cmd tea.Cmd
+			m.formInputs[m.formFocus], cmd = m.formInputs[m.formFocus].Update(msg)
+			return m, cmd
 		}
 
-		switch msg.String() {
-		case "/":
-			if m.state == DashboardView && (m.active == RegisterPanel || m.active == GroupPanel) {
-				m.searchMode = true
-				m.searchQuery = ""
-				return m, nil
-			}
-		case "ctrl+c", "q":
-			if m.state == DashboardView {
-				return m, tea.Quit
-			}
-		case "esc":
-			if m.state == FormView {
+		if m.state == DetailView {
+			switch msg.String() {
+			case "esc":
 				m.state = DashboardView
+				m.selectedSkill = nil
+				m.err = nil
 				return m, nil
-			}
-			if m.state == DetailView {
-				m.state = DashboardView
-				return m, nil
-			}
-		case "tab":
-			if m.state == DashboardView {
-				m.active = (m.active + 1) % 4
-			}
-		case "shift+tab":
-			if m.state == DashboardView {
-				m.active = (m.active + 3) % 4
-			}
-		case "up", "k":
-			if m.state == DashboardView {
-				if m.selectedRow[m.active] > 0 {
-					m.selectedRow[m.active]--
-				}
-			} else if m.state == FormView {
-				if m.formFocus > 0 {
-					m.formFocus--
-				}
-			}
-		case "down", "j":
-			if m.state == DashboardView {
-				max := m.getPanelCount(m.active)
-				if m.selectedRow[m.active] < max-1 {
-					m.selectedRow[m.active]++
-				}
-			} else if m.state == FormView {
-				if m.formFocus < len(m.formFields)-1 {
-					m.formFocus++
-				}
-			}
-		case "a":
-			if m.state == DashboardView {
-				m.setupForm()
-				return m, nil
-			}
-		case "d":
-			if m.state == DashboardView {
-				return m, m.deleteSelected()
-			}
-		case "enter":
-			if m.state == DashboardView && m.active == RegisterPanel {
-				if len(m.filteredItems) > 0 && m.selectedRow[RegisterPanel] < len(m.filteredItems) {
-					item := m.filteredItems[m.selectedRow[RegisterPanel]]
-					if !item.IsRegistry && item.Skill != nil {
-						b, _ := json.MarshalIndent(item.Skill, "", "  ")
-						m.detailContent = string(b)
-						m.state = DetailView
-						return m, nil
+			case "p", "P":
+				if m.selectedSkill != nil {
+					m.active = ProjectPanel
+					m.setupForm()
+					m.formInputs[0].SetValue(m.selectedSkill.Name)
+					if len(m.formInputs) > 1 {
+						m.formInputs[1].SetValue(m.selectedSkill.RegistryName)
 					}
+					return m, nil
 				}
-			}
-			if m.state == DashboardView && m.active == GroupPanel {
-				if len(m.filteredGroupItems) > 0 && m.selectedRow[GroupPanel] < len(m.filteredGroupItems) {
-					item := m.filteredGroupItems[m.selectedRow[GroupPanel]]
-					if !item.IsGroup && item.Skill != nil {
-						b, _ := json.MarshalIndent(item.Skill, "", "  ")
-						m.detailContent = string(b)
-						m.state = DetailView
-						return m, nil
+			case "g", "G":
+				if m.selectedSkill != nil {
+					m.active = GlobalPanel
+					m.setupForm()
+					m.formInputs[0].SetValue(m.selectedSkill.Name)
+					if len(m.formInputs) > 1 {
+						m.formInputs[1].SetValue(m.selectedSkill.RegistryName)
 					}
+					return m, nil
 				}
 			}
-			if m.state == FormView {
-				return m, m.submitForm()
-			}
-		case "backspace":
-			if m.state == FormView {
-				if len(m.formValues[m.formFocus]) > 0 {
-					m.formValues[m.formFocus] = m.formValues[m.formFocus][:len(m.formValues[m.formFocus])-1]
-				}
-			}
-		default:
-			if m.state == FormView {
-				if len(msg.String()) == 1 {
-					m.formValues[m.formFocus] += msg.String()
+			m.detailViewport, cmd = m.detailViewport.Update(msg)
+			return m, cmd
+		}
+
+		if m.state == DashboardView {
+			if !m.isFiltering() {
+				switch msg.String() {
+				case "ctrl+c", "q":
+					return m, tea.Quit
+				case "tab":
+					m.active = (m.active + 1) % 4
+					m.updateActiveListStyle()
+					return m, nil
+				case "shift+tab":
+					m.active = (m.active + 3) % 4
+					m.updateActiveListStyle()
+					return m, nil
+				case "a":
+					m.setupForm()
+					return m, nil
+				case "d":
+					return m, m.deleteSelected()
+				case "enter":
+					if m.active == RegisterPanel {
+						if item, ok := m.registerList.SelectedItem().(RegisterItem); ok {
+							if !item.IsRegistry && item.Skill != nil {
+								m.showDetailView(item.Skill)
+								return m, nil
+							}
+						}
+					} else if m.active == GroupPanel {
+						if item, ok := m.groupList.SelectedItem().(GroupItem); ok {
+							if !item.IsGroup && item.Skill != nil {
+								m.showDetailView(item.Skill)
+								return m, nil
+							}
+						}
+					}
 				}
 			}
 		}
@@ -425,72 +390,135 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
+		halfW := m.width / 2
+		halfH := m.height / 2
+
+		m.projectList.SetSize(halfW, halfH)
+		m.registerList.SetSize(halfW, halfH)
+		m.globalList.SetSize(halfW, halfH-8)
+		m.groupList.SetSize(halfW, halfH-8)
+
+		m.detailViewport.Width = m.width - 4
+		m.detailViewport.Height = m.height - 6
+
 	case dataLoadedMsg:
 		m.projectSkills = msg.projectSkills
 		m.globalSkills = msg.globalSkills
 		m.registerItems = msg.registerItems
 		m.groupItems = msg.groupItems
-		m.filterRegisterItems()
-		m.filterGroupItems()
+
+		m.projectList.SetItems(toItems(m.projectSkills))
+		m.globalList.SetItems(toItems(m.globalSkills))
+		m.registerList.SetItems(toItems(m.registerItems))
+		m.groupList.SetItems(toItems(m.groupItems))
+
+		m.updateActiveListStyle()
 		m.state = DashboardView
 
 	case errMsg:
 		m.err = msg.err
 	}
 
+	if m.state == DashboardView {
+		var cmd tea.Cmd
+		switch m.active {
+		case ProjectPanel:
+			m.projectList, cmd = m.projectList.Update(msg)
+		case GlobalPanel:
+			m.globalList, cmd = m.globalList.Update(msg)
+		case RegisterPanel:
+			m.registerList, cmd = m.registerList.Update(msg)
+		case GroupPanel:
+			m.groupList, cmd = m.groupList.Update(msg)
+		}
+		return m, cmd
+	}
+
 	return m, nil
 }
 
-func (m Model) getPanelCount(p Panel) int {
-	switch p {
+func (m Model) isFiltering() bool {
+	switch m.active {
 	case ProjectPanel:
-		return len(m.projectSkills)
-	case RegisterPanel:
-		return len(m.filteredItems)
+		return m.projectList.FilterState() == list.Filtering
 	case GlobalPanel:
-		return len(m.globalSkills)
+		return m.globalList.FilterState() == list.Filtering
+	case RegisterPanel:
+		return m.registerList.FilterState() == list.Filtering
 	case GroupPanel:
-		return len(m.filteredGroupItems)
+		return m.groupList.FilterState() == list.Filtering
 	}
-	return 0
+	return false
+}
+
+func (m *Model) showDetailView(skill *internal.Skill) {
+	b, _ := json.MarshalIndent(skill, "", "  ")
+	m.selectedSkill = skill
+	m.err = nil
+
+	m.detailViewport = viewport.New(m.width-4, m.height-6)
+	m.detailViewport.Style = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		PaddingRight(2)
+	m.detailViewport.SetContent(string(b))
+
+	m.state = DetailView
 }
 
 func (m *Model) setupForm() {
 	m.state = FormView
 	m.formFocus = 0
+	m.err = nil
+	m.formInputs = nil
+
+	var fields []string
 	switch m.active {
 	case RegisterPanel:
 		m.formTitle = "Add Registry"
-		m.formFields = []string{"Name", "URL"}
-		m.formValues = []string{"", ""}
+		fields = []string{"Name", "URL"}
 	case GroupPanel:
 		m.formTitle = "Create Group"
-		m.formFields = []string{"Name", "Description"}
-		m.formValues = []string{"", ""}
+		fields = []string{"Name", "Description"}
 	case ProjectPanel, GlobalPanel:
 		m.formTitle = "Add Skill/Group"
-		m.formFields = []string{"Name", "Registry (optional)", "Agents (comma separated)"}
-		m.formValues = []string{"", "", ""}
+		fields = []string{"Name", "Registry (optional)", "Agents (comma separated)"}
+	}
+
+	for i, f := range fields {
+		ti := textinput.New()
+		ti.Placeholder = f
+		if i == 0 {
+			ti.Focus()
+		}
+		m.formInputs = append(m.formInputs, ti)
 	}
 }
 
 func (m Model) submitForm() tea.Cmd {
 	return func() tea.Msg {
+		val := func(idx int) string {
+			if idx < len(m.formInputs) {
+				return m.formInputs[idx].Value()
+			}
+			return ""
+		}
+
 		var err error
 		switch m.active {
 		case RegisterPanel:
-			err = m.app.RegisterAdd(m.formValues[1], m.formValues[0], "")
+			err = m.app.RegisterAdd(val(1), val(0), "")
 		case GroupPanel:
-			err = m.app.CreateGroup(m.formValues[0], m.formValues[1])
+			err = m.app.CreateGroup(val(0), val(1))
 		case ProjectPanel, GlobalPanel:
 			global := m.active == GlobalPanel
 			cwd, _ := os.Getwd()
-			name := m.formValues[0]
-			reg := m.formValues[1]
+			name := val(0)
+			reg := val(1)
 			agents := []string{}
-			if m.formValues[2] != "" {
+			if val(2) != "" {
 				// simple comma split
-				for s := range strings.SplitSeq(m.formValues[2], ",") {
+				for s := range strings.SplitSeq(val(2), ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {
 						agents = append(agents, s)
@@ -500,8 +528,6 @@ func (m Model) submitForm() tea.Cmd {
 
 			// We need to decide if it's a skill or group.
 			// Try AddSkill first, if not found or something, well, AddGroup.
-			// Actually, the CLI usually has separate commands.
-			// Let's assume user wants to add skill.
 			err = m.app.AddSkill(cwd, name, reg, agents, global, false)
 			if err != nil {
 				// try group
@@ -520,33 +546,27 @@ func (m Model) deleteSelected() tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		cwd, _ := os.Getwd()
-		idx := m.selectedRow[m.active]
 
 		switch m.active {
 		case RegisterPanel:
-			if idx < len(m.filteredItems) {
-				item := m.filteredItems[idx]
+			if item, ok := m.registerList.SelectedItem().(RegisterItem); ok {
 				if item.IsRegistry {
 					err = m.app.RegisterRemove(item.Name, false)
 				}
 			}
 		case GroupPanel:
-			if idx < len(m.filteredGroupItems) {
-				item := m.filteredGroupItems[idx]
+			if item, ok := m.groupList.SelectedItem().(GroupItem); ok {
 				if item.IsGroup {
 					err = m.app.DeleteGroup(item.Name)
 				}
 			}
-		case ProjectPanel, GlobalPanel:
-			global := m.active == GlobalPanel
-			if global {
-				if idx < len(m.globalSkills) {
-					err = m.app.RemoveSkill(cwd, m.globalSkills[idx].ID, nil, global)
-				}
-			} else {
-				if idx < len(m.projectSkills) {
-					err = m.app.RemoveSkill(cwd, m.projectSkills[idx].ID, nil, global)
-				}
+		case ProjectPanel:
+			if item, ok := m.projectList.SelectedItem().(ResolvedSkill); ok {
+				err = m.app.RemoveSkill(cwd, item.ID, nil, false)
+			}
+		case GlobalPanel:
+			if item, ok := m.globalList.SelectedItem().(ResolvedSkill); ok {
+				err = m.app.RemoveSkill(cwd, item.ID, nil, true)
 			}
 		}
 
@@ -555,4 +575,19 @@ func (m Model) deleteSelected() tea.Cmd {
 		}
 		return m.loadData()
 	}
+}
+
+// Helper to convert slices to []list.Item
+func toItems[T any](items []T) []list.Item {
+	var listItems []list.Item
+	for _, i := range items {
+		if item, ok := any(i).(list.Item); ok {
+			listItems = append(listItems, item)
+		}
+	}
+	return listItems
+}
+
+func (m *Model) updateActiveListStyle() {
+	// We no longer change internal list styles as the focus is shown by the container border
 }

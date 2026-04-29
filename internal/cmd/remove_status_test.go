@@ -109,7 +109,10 @@ func TestRefactoredLogic(t *testing.T) {
 	ctxCfg, _ := store.EnsureLocalContext(projectDir)
 	found := false
 	for _, in := range ctxCfg.InactiveSkills {
-		if in.Name == "skill1" { found = true; break }
+		if in.Name == "skill1" {
+			found = true
+			break
+		}
 	}
 	// skill1 was provided by groupB (id1) and user (id2).
 	// Both matching IDs should be removed from ActiveSkills.

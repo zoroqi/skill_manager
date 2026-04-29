@@ -1,8 +1,12 @@
 package tui
 
 import (
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/zoroqi/skill_manager/internal"
 	"github.com/zoroqi/skill_manager/internal/app"
+	"strings"
 )
 
 type ViewState int
@@ -37,10 +41,10 @@ type RegisterItem struct {
 }
 
 type GroupItem struct {
-	IsGroup     bool
-	Name        string
-	Description string
-	Skill       *internal.Skill
+	IsGroup bool
+	Name    string
+	Summary string
+	Skill   *internal.Skill
 }
 
 type Model struct {
@@ -50,33 +54,69 @@ type Model struct {
 	width  int
 	height int
 
-	// Data for Dashboard
+	// Bubbles List models for Dashboard
+	projectList  list.Model
+	globalList   list.Model
+	registerList list.Model
+	groupList    list.Model
+
+	// Data backing the lists (keep for easier data management/filtering)
 	projectSkills []ResolvedSkill
 	globalSkills  []ResolvedSkill
-
-	registerItems      []RegisterItem
-	filteredItems      []RegisterItem
-	groupItems         []GroupItem
-	filteredGroupItems []GroupItem
-
-	selectedRow [4]int // index for each panel
+	registerItems []RegisterItem
+	groupItems    []GroupItem
 
 	// Form related state
 	formTitle  string
-	formFields []string
-	formValues []string
+	formInputs []textinput.Model
 	formFocus  int
 	err        error
 
-	searchMode    bool
-	searchQuery   string
-	detailContent string
+	// Detail View State
+	detailViewport viewport.Model
+	selectedSkill  *internal.Skill
 }
 
 func NewModel(a *app.App) Model {
-	return Model{
+	m := Model{
 		app:    a,
 		state:  DashboardView,
 		active: ProjectPanel,
 	}
+	// Pre-initialize lists with empty items to avoid panics on SetSize before data is loaded
+	empty := []list.Item{}
+	delegate := skillDelegate{}
+
+	// Helper to create and configure a list
+	makeList := func(title string) list.Model {
+		l := list.New(empty, delegate, 0, 0)
+		l.Title = title
+		l.Filter = func(term string, targets []string) []list.Rank {
+			var ranks []list.Rank
+			if term == "" {
+				return ranks
+			}
+
+			term = strings.ToLower(term)
+			for i, target := range targets {
+				if strings.Contains(strings.ToLower(target), term) {
+					ranks = append(ranks, list.Rank{Index: i})
+				}
+			}
+			return ranks
+		}
+		l.SetShowHelp(false)
+		l.SetShowStatusBar(false)
+		l.SetShowTitle(false)
+		return l
+	}
+
+	m.projectList = makeList("Project Skills")
+	m.globalList = makeList("Global Skills")
+	m.registerList = makeList("Registries & Skills")
+	m.groupList = makeList("Groups & Skills")
+
+	m.detailViewport = viewport.New(0, 0)
+
+	return m
 }

@@ -4,51 +4,51 @@
 `skill_manager` 包含一個基於文本的使用者介面 (TUI)，使用 `charmbracelet/bubbletea` 框架開發。TUI 旨在提供一個免記憶 CLI 參數、互動式的操作環境來管理本地的專案技能、全域技能、遠端技能註冊 (Registers) 以及技能群組 (Groups)。
 
 ## 架構設計 (Architecture Design)
-TUI 系統主要實作於 `internal/tui` 目錄中，嚴格遵循 Elm 架構 (Model, Update, View)。
+TUI 系統主要實作於 `internal/tui` 目錄中，嚴格遵循 Elm 架構 (Model, Update, View)，並廣泛採用 `charmbracelet/bubbles` 官方組件庫以降低複雜度。
 
 ### 1. 模型 (Model)
 - **檔案:** `internal/tui/model.go`
 - **結構:** `Model` 結構體保存了整個 TUI 的狀態。
   - `state` (`ViewState`): 控制當前畫面的模式，包含儀表板 (`DashboardView`)、輸入表單 (`FormView`) 與詳細資訊視圖 (`DetailView`)。
   - `active` (`Panel`): 指示當前獲得焦點的面板（0: 專案, 1: Register, 2: 全域, 3: Group）。
-  - `selectedRow`: 一個長度為 4 的陣列，分別記錄四個面板目前選定的行數游標 (`idx`)。
-  - `searchMode` & `searchQuery`: 用於控制並暫存 Register 和 Group 面板的快速檢索狀態。
-  - `projectSkills`, `globalSkills`: 儲存經過解析的當前/全域技能使用狀態 (`ResolvedSkill`)。
-  - `registerItems`, `groupItems`: 採用扁平化陣列結構儲存 Register 和 Group 資訊。
+  - **Bubbles 組件**:
+    - `projectList`, `globalList`, `registerList`, `groupList` (`list.Model`): 分別負責四個區域的列表展示、搜尋過濾與導覽。
+    - `formInputs` (`[]textinput.Model`): 管理表單中的多個輸入框，支援焦點切換。
+    - `detailViewport` (`viewport.Model`): 用於展示長篇幅的技能詳細資訊 JSON，支援捲動。
 
-### 2. 資料解析與扁平化 (Data Resolution & Flattening)
-為了讓複雜的巢狀資料能在 TUI 中被輕易的捲動和選中，我們採用了「資料扁平化」策略：
-- **`ResolvedSkill`**: 將 `app.GetStatus` 取得的狀態進行解析，合併來源 (User 或特定 Group) 和有效的 Agent，計算出 `ID`, `Register`, `Agents`, `Source` 供表格化展示。
-- **`RegisterItem` & `GroupItem`**: 將一個 Register/Group 與其底下的多個 Skill 轉換為平坦的項目陣列。每個項目包含一個布林值旗標 (`IsRegistry` / `IsGroup`) 來區分這行是標題列還是子技能列，這樣游標就能夠逐行精確選中。
+### 2. 資料模型與介面實作 (Data Model & Interface Implementation)
+- **檔案:** `internal/tui/list_items.go`
+- 為了與 `bubbles/list` 相容，專案中的資料結構 (`ResolvedSkill`, `RegisterItem`, `GroupItem`) 均實作了 `list.Item` 介面：
+  - `Title()`, `Description()`, `FilterValue()`。
+- **展示委派 (`skillDelegate`)**:
+  - 位於 `internal/tui/delegate.go`，負責自定義列表項目的渲染。
+  - **緊湊布局**: 採用單行渲染，優化大螢幕空間利用率。
+  - **層次化展示 (Hierarchy)**: 在 Register 與 Group 窗口中，父級項目加粗顯示，子技能則透過縮排 (`%-20s`) 展示於 `skill_name` 欄位下，建立清晰的隸屬關係。
 
 ### 3. 更新與事件處理 (Update)
 - **檔案:** `internal/tui/update.go`
+- **邏輯委派**: `Update` 函式將大部分按鍵事件委派給當前獲得焦點的組件（如當前的 `list` 或 `textinput`）。
 - **按鍵綁定 (Keybindings):**
   - **導覽**:
     - `Tab` / `Shift+Tab`: 在四個面板間循環切換焦點。
-    - `j` / `k` (或 上下方向鍵): 在當前獲得焦點的面板內上下移動游標。
+    - `Up` / `Down` (或 `j` / `k`): 在列表內移動。
   - **操作**:
-    - `a`: 觸發新增操作，進入 `FormView`。
-    - `d`: 刪除當前游標所選中的項目。
+    - `a`: 進入 `FormView` 新增 Registry、Group 或 Skill。
+    - `d`: 刪除目前選中的項目。
     - `Enter`: 
-      - 在 `FormView` 中送出表單。
-      - 在 Register/Group 面板中若選中具體的 Skill，則進入 `DetailView` 以格式化的 JSON 展示技能詳細資訊。
-    - `/`: 進入檢索模式 (`searchMode`)，針對 Register 或 Group 面板進行快速名稱過濾。
-  - **全域**: `Ctrl+C` 或 `q` 退出程式；`Esc` 取消表單、退出詳情頁或退出搜尋模式。
+      - 在 Dashboard 進入選中技能的詳情頁。
+      - 在 `FormView` 跳轉至下一欄位或送出表單。
+    - `/`: 開啟當前列表的內建搜尋過濾功能。
+  - **詳情頁快捷鍵**: 
+    - `p` / `g`: 直接將當前查看的技能加入專案或全域配置。
 
 ### 4. 視圖渲染 (View)
 - **檔案:** `internal/tui/view.go`
-- **佈局:**
-  - 主畫面 (`dashboardView`) 採用 2x2 的網格佈局。
-  - 左半邊顯示：Project Skills (上)、Global Skills (下)。
-  - 右半邊顯示：Registries (上)、Groups (下)。
-- **表格渲染 (`renderPanel`)**:
-  - 每個面板會根據傳入的寬高進行計算。
-  - 實作了 `truncate` 函數，當文字超過面板寬度時自動截斷以防止版面跑版。
-  - 實作了**自動捲動 (Auto-scroll)** 機制：當項目數量超過面板高度 (`viewHeight`) 時，根據當前游標 (`idx`) 計算 `startIdx`，只渲染可見範圍內的項目。
-  - 被選中的面板外框會以綠色高亮，當下游標所在的行則會使用 ANSI 反白 (`\033[7m`)。
-- **搜尋列**: 當進入 `searchMode` 時，底部會出現實體的輸入框，即時顯示 `searchQuery`。
+- **佈局與樣式**: 採用 `charmbracelet/lipgloss` 進行樣式定義與佈局拼接。
+  - 主畫面 (`dashboardView`) 採用 2x2 網格。
+  - **高亮機制**: 獲得焦點的面板會以亮綠色 (`Color 2`) 粗邊框顯示，未獲焦點則顯示灰色細邊框。
+  - **自定義標題**: 每個面板頂部均設有固定的列標題（如 `Name`, `Register`, `Agent`, `Source`），確保資料對齊。
 
 ## 擴充性 (Extensibility)
-- 若要新增新的面板，只需在 `Panel` 常數中擴充，並調整 `dashboardView` 的網格切割比例。
-- 若要支援更多欄位的表單，只需在 `setupForm` 中增加 `formFields` 的定義，並在 `submitForm` 補上對應的處理邏輯即可。
+- **新組件**: 透過引入官方 `bubbles` 組件，新增功能（如分頁、搜尋）變得更加簡單且穩定。
+- **表單擴展**: 只需在 `setupForm` 中增加 `textinput` 實例，並在 `submitForm` 讀取其 `Value()` 即可。

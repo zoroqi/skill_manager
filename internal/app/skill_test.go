@@ -129,4 +129,3 @@ func TestAddSkillUpdatesSummary(t *testing.T) {
 	}
 	assert.True(t, found, "Project directory should be in summary")
 }
-

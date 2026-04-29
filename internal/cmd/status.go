@@ -67,10 +67,10 @@ var statusCmd = &cobra.Command{
 		// 2. Resolve final skills per agent to track effective state
 		// agent -> skillName -> effectiveSkillID
 		effectiveID := make(map[string]map[string]string)
-		
+
 		// agent -> skillID -> sources
 		idSources := make(map[string]map[string]map[string]bool)
-		
+
 		setEffective := func(agent, skillName, id, source string) {
 			if effectiveID[agent] == nil {
 				effectiveID[agent] = make(map[string]string)
@@ -78,7 +78,7 @@ var statusCmd = &cobra.Command{
 			if _, exists := effectiveID[agent][skillName]; !exists {
 				effectiveID[agent][skillName] = id
 			}
-			
+
 			// Only track source if this ID is the effective one for this name
 			if effectiveID[agent][skillName] == id {
 				if idSources[agent] == nil {
@@ -94,9 +94,13 @@ var statusCmd = &cobra.Command{
 		// Process User Added (Highest priority)
 		for _, usage := range ctxCfg.ActiveSkills {
 			skill, ok := skillMap[usage.ID]
-			if !ok { continue }
+			if !ok {
+				continue
+			}
 			agents := usage.Agents
-			if len(agents) == 0 { agents = existingAgents }
+			if len(agents) == 0 {
+				agents = existingAgents
+			}
 			for _, a := range agents {
 				setEffective(a, skill.Name, skill.ID, "user")
 			}
@@ -111,13 +115,19 @@ var statusCmd = &cobra.Command{
 
 		for _, usage := range sortedGroups {
 			group, ok := groupMap[usage.Name]
-			if !ok { continue }
+			if !ok {
+				continue
+			}
 			agents := usage.Agents
-			if len(agents) == 0 { agents = existingAgents }
+			if len(agents) == 0 {
+				agents = existingAgents
+			}
 
 			for _, skillID := range group.SkillIDs {
 				skill, ok := skillMap[skillID]
-				if !ok { continue }
+				if !ok {
+					continue
+				}
 				for _, a := range agents {
 					if isInactive(skill.Name, a) {
 						continue
