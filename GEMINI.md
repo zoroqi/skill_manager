@@ -29,6 +29,7 @@ Skill Manager 是一款專為 AI Agent 設計的本地技能管理工具，旨�
 ...
 - `docs/target.md`: 初始需求構思與目標。
 - `docs/design/skill_manager_design.md`: 核心技術設計文檔。
+- `docs/design/tui_design.md`: tui 設計文檔。
 - `go.mod`: 項目依賴與模塊定義。
 - `AGENTS.md`: 用於 Agent 相關的專屬文檔（目前為空）。
 

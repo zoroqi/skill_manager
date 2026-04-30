@@ -9,11 +9,13 @@ TUI 系統主要實作於 `internal/tui` 目錄中，嚴格遵循 Elm 架構 (Mo
 ### 1. 模型 (Model)
 - **檔案:** `internal/tui/model.go`
 - **結構:** `Model` 結構體保存了整個 TUI 的狀態。
-  - `state` (`ViewState`): 控制當前畫面的模式，包含儀表板 (`DashboardView`)、輸入表單 (`FormView`) 與詳細資訊視圖 (`DetailView`)。
+  - `state` (`ViewState`): 控制當前畫面的模式，包含儀表板 (`DashboardView`)、輸入表單 (`FormView`)、詳細資訊視圖 (`DetailView`)、群組選擇視圖 (`GroupSelectionView`) 以及刪除確認視圖 (`ConfirmView`)。
   - `active` (`Panel`): 指示當前獲得焦點的面板（0: 專案, 1: Register, 2: 全域, 3: Group）。
   - `statusMsg` (`string`): 用於顯示操作結果的反饋訊息（如「添加成功」）。
+  - `confirmMsg` (`string`): 用於在 `ConfirmView` 中顯示具體的二次確認訊息。
   - **Bubbles 組件**:
     - `projectList`, `globalList`, `registerList`, `groupList` (`list.Model`): 分別負責四個區域的列表展示、搜尋過濾與導覽。
+    - `groupSelectionList` (`list.Model`): 用於在將技能加入群組時提供可搜尋的選擇列表。
     - `formInputs` (`[]textinput.Model`): 管理表單中的多個輸入框，支援焦點切換。
     - `detailViewport` (`viewport.Model`): 用於展示長篇幅的技能或群組詳細資訊 JSON，支援捲動。
   - **選取狀態**:
@@ -37,13 +39,22 @@ TUI 系統主要實作於 `internal/tui` 目錄中，嚴格遵循 Elm 架構 (Mo
     - `Up` / `Down` (或 `j` / `k`): 在列表內移動。
   - **操作**:
     - `a`: 進入 `FormView` 新增 Registry、Group 或 Skill。
-    - `d`: 刪除目前選中的項目（支援從專案/全域中移除技能，或刪除註冊/群組定義）。
+    - `d`: 觸發刪除流程。系統會根據當前選中的項目類型進入 `ConfirmView` 顯示二次確認訊息。
+      - 支援從專案/全域中移除技能。
+      - 支援刪除註冊庫或群組定義。
+      - **新增**: 在 Group 面板中選中子技能時，支援將該技能從特定群組中移除。
     - `Enter`: 
       - 在 Dashboard：進入選中項目的詳情頁（在 Group 面板中，僅限對「群組標題」進行詳情檢視）。
       - 在 `FormView`：跳轉至下一欄位或送出表單。
+      - 在 `GroupSelectionView` / `ConfirmView`：確認操作。
     - `/`: 開啟當前列表的內建搜尋過濾功能。
   - **詳情頁快捷鍵**: 
     - `p` / `g`: 將當前查看的技能或**整個群組**加入專案或全域配置（自動辨識對象類型）。
+    - `u`: (僅限技能) 將當前技能加入到指定的群組，觸發 `GroupSelectionView` 提供搜尋清單。
+  - **確認與選擇視圖**:
+    - `y` / `Enter`: 在 `ConfirmView` 中確認刪除。
+    - `n` / `Esc`: 在 `ConfirmView` 中取消刪除。
+    - `Esc`: 在 `GroupSelectionView` 中取消選擇並返回。
 - **操作反饋與自動重新整理 (Feedback & Refresh)**:
   - 所有寫入操作（新增、刪除、註冊、加入環境）成功後，均會產生對應的反饋訊息。
   - 成功後自動觸發 `loadData` 重新讀取配置並重置視圖狀態（如關閉表單、清空選取），確保 UI 數據的最終一致性。

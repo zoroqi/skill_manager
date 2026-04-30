@@ -15,6 +15,8 @@ const (
 	DashboardView ViewState = iota
 	FormView
 	DetailView
+	GroupSelectionView
+	ConfirmView
 )
 
 type Panel int
@@ -41,11 +43,12 @@ type RegisterItem struct {
 }
 
 type GroupItem struct {
-	IsGroup bool
-	Name    string
-	Summary string
-	Skill   *internal.Skill
-	Group   *internal.Group
+	IsGroup     bool
+	Name        string
+	Summary     string
+	Skill       *internal.Skill
+	Group       *internal.Group
+	ParentGroup string // Name of the group this skill belongs to
 }
 
 type Model struct {
@@ -56,10 +59,11 @@ type Model struct {
 	height int
 
 	// Bubbles List models for Dashboard
-	projectList  list.Model
-	globalList   list.Model
-	registerList list.Model
-	groupList    list.Model
+	projectList        list.Model
+	globalList         list.Model
+	registerList       list.Model
+	groupList          list.Model
+	groupSelectionList list.Model
 
 	// Data backing the lists (keep for easier data management/filtering)
 	projectSkills []ResolvedSkill
@@ -73,6 +77,7 @@ type Model struct {
 	formFocus  int
 	err        error
 	statusMsg  string
+	confirmMsg string
 
 	// Detail View State
 	detailViewport viewport.Model
@@ -118,6 +123,7 @@ func NewModel(a *app.App) Model {
 	m.globalList = makeList("Global Skills")
 	m.registerList = makeList("Registries & Skills")
 	m.groupList = makeList("Groups & Skills")
+	m.groupSelectionList = makeList("Select Group")
 
 	m.detailViewport = viewport.New(0, 0)
 

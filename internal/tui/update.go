@@ -83,9 +83,10 @@ func (m Model) loadData(status string) tea.Cmd {
 					if s.ID == sid {
 						skillCopy := s
 						grpItems = append(grpItems, GroupItem{
-							IsGroup: false,
-							Name:    s.Name,
-							Skill:   &skillCopy,
+							IsGroup:     false,
+							Name:        s.Name,
+							Skill:       &skillCopy,
+							ParentGroup: g.Name,
 						})
 						break
 					}
@@ -359,9 +360,47 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.formInputs[0].SetValue(m.selectedGroup.Name)
 					return m, nil
 				}
+			case "u", "U":
+				if m.selectedSkill != nil {
+					var groups []list.Item
+					for _, item := range m.groupItems {
+						if item.IsGroup {
+							groups = append(groups, item)
+						}
+					}
+					m.groupSelectionList.SetItems(groups)
+					m.state = GroupSelectionView
+					return m, nil
+				}
 			}
 			m.detailViewport, cmd = m.detailViewport.Update(msg)
 			return m, cmd
+		}
+
+		if m.state == GroupSelectionView {
+			switch msg.String() {
+			case "esc":
+				m.state = DetailView
+				return m, nil
+			case "enter":
+				if item, ok := m.groupSelectionList.SelectedItem().(GroupItem); ok {
+					return m, m.addSkillToGroup(item.Name)
+				}
+			}
+			m.groupSelectionList, cmd = m.groupSelectionList.Update(msg)
+			return m, cmd
+		}
+
+		if m.state == ConfirmView {
+			switch msg.String() {
+			case "y", "Y", "enter":
+				m.state = DashboardView
+				return m, m.deleteSelected()
+			case "n", "N", "esc":
+				m.state = DashboardView
+				return m, nil
+			}
+			return m, nil
 		}
 
 		if m.state == DashboardView {
@@ -381,7 +420,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.setupForm()
 					return m, nil
 				case "d":
-					return m, m.deleteSelected()
+					m.confirmMsg = m.getDeleteConfirmMsg()
+					if m.confirmMsg != "" {
+						m.state = ConfirmView
+						return m, nil
+					}
+					return m, nil
 				case "enter":
 					if m.active == RegisterPanel {
 						if item, ok := m.registerList.SelectedItem().(RegisterItem); ok {
@@ -411,8 +455,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.projectList.SetSize(halfW, halfH)
 		m.registerList.SetSize(halfW, halfH)
-		m.globalList.SetSize(halfW, halfH-8)
-		m.groupList.SetSize(halfW, halfH-8)
+		m.globalList.SetSize(halfW, halfH-10)
+		m.groupList.SetSize(halfW, halfH-10)
+		m.groupSelectionList.SetSize(m.width-4, m.height-6)
 
 		m.detailViewport.Width = m.width - 4
 		m.detailViewport.Height = m.height - 6
@@ -587,6 +632,34 @@ func (m Model) submitForm() tea.Cmd {
 	}
 }
 
+func (m Model) getDeleteConfirmMsg() string {
+	switch m.active {
+	case RegisterPanel:
+		if item, ok := m.registerList.SelectedItem().(RegisterItem); ok {
+			if item.IsRegistry {
+				return fmt.Sprintf("Are you sure you want to remove registry '%s'?", item.Name)
+			}
+		}
+	case GroupPanel:
+		if item, ok := m.groupList.SelectedItem().(GroupItem); ok {
+			if item.IsGroup {
+				return fmt.Sprintf("Are you sure you want to delete group '%s'?", item.Name)
+			} else if item.ParentGroup != "" {
+				return fmt.Sprintf("Are you sure you want to remove skill '%s' from group '%s'?", item.Name, item.ParentGroup)
+			}
+		}
+	case ProjectPanel:
+		if item, ok := m.projectList.SelectedItem().(ResolvedSkill); ok {
+			return fmt.Sprintf("Are you sure you want to remove skill '%s' from project?", item.ID)
+		}
+	case GlobalPanel:
+		if item, ok := m.globalList.SelectedItem().(ResolvedSkill); ok {
+			return fmt.Sprintf("Are you sure you want to remove skill '%s' from global?", item.ID)
+		}
+	}
+	return ""
+}
+
 func (m Model) deleteSelected() tea.Cmd {
 	return func() tea.Msg {
 		var err error
@@ -606,6 +679,9 @@ func (m Model) deleteSelected() tea.Cmd {
 				if item.IsGroup {
 					err = m.app.DeleteGroup(item.Name)
 					successMsg = fmt.Sprintf("Group '%s' deleted", item.Name)
+				} else if item.ParentGroup != "" {
+					err = m.app.RemoveSkillFromGroup(item.ParentGroup, []string{item.Name})
+					successMsg = fmt.Sprintf("Skill '%s' removed from group '%s'", item.Name, item.ParentGroup)
 				}
 			}
 		case ProjectPanel:
@@ -624,6 +700,19 @@ func (m Model) deleteSelected() tea.Cmd {
 			return errMsg{err}
 		}
 		return m.loadData(successMsg)()
+	}
+}
+
+func (m Model) addSkillToGroup(groupName string) tea.Cmd {
+	return func() tea.Msg {
+		if m.selectedSkill == nil {
+			return nil
+		}
+		err := m.app.AddSkillToGroup(groupName, []string{m.selectedSkill.Name}, m.selectedSkill.RegistryName)
+		if err != nil {
+			return errMsg{err}
+		}
+		return m.loadData(fmt.Sprintf("Skill '%s' added to group '%s'", m.selectedSkill.Name, groupName))()
 	}
 }
 

@@ -33,6 +33,12 @@ func (m Model) View() string {
 	if m.state == DetailView {
 		return m.detailView()
 	}
+	if m.state == GroupSelectionView {
+		return m.groupSelectionView()
+	}
+	if m.state == ConfirmView {
+		return m.confirmView()
+	}
 	return m.dashboardView()
 }
 
@@ -42,8 +48,8 @@ func (m Model) dashboardView() string {
 	halfH := m.height / 2
 	m.projectList.SetSize(halfW, halfH)
 	m.registerList.SetSize(halfW, halfH)
-	m.globalList.SetSize(halfW, halfH-8)
-	m.groupList.SetSize(halfW, halfH-8)
+	m.globalList.SetSize(halfW, halfH-10)
+	m.groupList.SetSize(halfW, halfH-10)
 
 	renderPanel := func(p Panel, l list.Model, header string) string {
 		style := inactiveStyle
@@ -57,7 +63,7 @@ func (m Model) dashboardView() string {
 
 		content := lipgloss.JoinVertical(lipgloss.Left, titleStr, colHeaderStr, l.View())
 
-		return style.Width(halfW).Height(halfH - 8).Render(content)
+		return style.Width(halfW).Height(halfH - 10).Render(content)
 	}
 
 	projectHeader := fmt.Sprintf(SkillHeaderFormat, "Name", "Register", "Agent", "Source")
@@ -123,6 +129,7 @@ func (m Model) detailView() string {
 	ops := lipgloss.JoinHorizontal(lipgloss.Top,
 		greenStyle.Render("[P]"), " Add to Project  ",
 		greenStyle.Render("[G]"), " Add to Global   ",
+		greenStyle.Render("[U]"), " Add to Group    ",
 		greenStyle.Render("[Esc]"), " Back",
 	)
 
@@ -145,4 +152,26 @@ func (m Model) detailView() string {
 	}
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(content)
+}
+
+func (m Model) groupSelectionView() string {
+	m.groupSelectionList.SetSize(m.width-4, m.height-6)
+
+	title := boldStyle.Render("Select Group for " + m.selectedSkill.Name)
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		m.groupSelectionList.View(),
+		"\n (Enter to confirm, Esc to cancel)",
+	)
+
+	return lipgloss.NewStyle().Padding(1, 2).Render(content)
+}
+
+func (m Model) confirmView() string {
+	var b strings.Builder
+	b.WriteString("\n  " + boldStyle.Render("Confirmation") + "\n\n")
+	b.WriteString("  " + m.confirmMsg + "\n\n")
+	b.WriteString("  " + greenStyle.Render("[Y] Yes") + "    " + lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render("[N] No") + "\n")
+
+	return b.String()
 }
