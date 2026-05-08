@@ -108,6 +108,32 @@ func (a *App) RegisterUpdate(name string) error {
 	return err
 }
 
+// RegisterUpdateAll pulls updates for all registered repositories.
+func (a *App) RegisterUpdateAll() error {
+	config, err := a.store.LoadRegistriesConfig()
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for _, r := range config.Registries {
+		fmt.Printf("Updating %s...\n", r.Name)
+		if err := a.RegisterUpdate(r.Name); err != nil {
+			errs = append(errs, fmt.Errorf("failed to update %s: %w", r.Name, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		var combined []string
+		for _, e := range errs {
+			combined = append(combined, e.Error())
+		}
+		return fmt.Errorf("encountered errors during full update:\n%s", strings.Join(combined, "\n"))
+	}
+
+	return nil
+}
+
 // RegisterList returns all registered repositories.
 func (a *App) RegisterList() ([]internal.Registry, error) {
 	config, err := a.store.LoadRegistriesConfig()

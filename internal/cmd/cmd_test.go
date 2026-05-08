@@ -51,4 +51,27 @@ func TestCommands(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "test-skill")
+
+	// 4. Test register update
+	// Single update
+	rootCmd.SetArgs([]string{"register", "update", "test-reg"})
+	err = rootCmd.Execute()
+	assert.NoError(t, err)
+
+	// All update
+	rootCmd.SetArgs([]string{"register", "update", "--all"})
+	err = rootCmd.Execute()
+	assert.NoError(t, err)
+
+	// Update without name or --all (should fail)
+	rootCmd.SetArgs([]string{"register", "update"})
+	err = rootCmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "requires exactly one registry name or use --all")
+
+	// Update with both name and --all (should fail)
+	rootCmd.SetArgs([]string{"register", "update", "test-reg", "--all"})
+	err = rootCmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot provide registry name when using --all")
 }

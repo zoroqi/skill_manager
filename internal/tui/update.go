@@ -410,11 +410,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				case "tab":
 					m.active = (m.active + 1) % 4
-					m.updateActiveListStyle()
 					return m, nil
 				case "shift+tab":
 					m.active = (m.active + 3) % 4
-					m.updateActiveListStyle()
 					return m, nil
 				case "a":
 					m.setupForm()
@@ -474,7 +472,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.registerList.SetItems(toItems(m.registerItems))
 		m.groupList.SetItems(toItems(m.groupItems))
 
-		m.updateActiveListStyle()
 		m.state = DashboardView
 		m.selectedSkill = nil
 		m.selectedGroup = nil
@@ -725,8 +722,4 @@ func toItems[T any](items []T) []list.Item {
 		}
 	}
 	return listItems
-}
-
-func (m *Model) updateActiveListStyle() {
-	// We no longer change internal list styles as the focus is shown by the container border
 }

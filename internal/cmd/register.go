@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	registerName string
-	registerPath string
-	deleteFiles  bool
+	registerName      string
+	registerPath      string
+	deleteFiles       bool
+	registerUpdateAll bool
 )
 
 var registerCmd = &cobra.Command{
@@ -33,10 +34,30 @@ var registerAddCmd = &cobra.Command{
 }
 
 var registerUpdateCmd = &cobra.Command{
-	Use:   "update <name>",
+	Use:   "update [name]",
 	Short: "Pull updates for a registered repository",
-	Args:  cobra.ExactArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if registerUpdateAll {
+			if len(args) > 0 {
+				return fmt.Errorf("cannot provide registry name when using --all")
+			}
+			return nil
+		}
+		if len(args) != 1 {
+			return fmt.Errorf("requires exactly one registry name or use --all")
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		defer func() { registerUpdateAll = false }()
+		if registerUpdateAll {
+			err := application.RegisterUpdateAll()
+			if err != nil {
+				return err
+			}
+			fmt.Println("Successfully updated all registries")
+			return nil
+		}
 		name := args[0]
 		err := application.RegisterUpdate(name)
 		if err != nil {
@@ -46,7 +67,6 @@ var registerUpdateCmd = &cobra.Command{
 		return nil
 	},
 }
-
 var registerListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all registered repositories",
@@ -91,5 +111,6 @@ func init() {
 
 	registerAddCmd.Flags().StringVarP(&registerName, "name", "n", "", "Custom name for the registry")
 	registerAddCmd.Flags().StringVarP(&registerPath, "path", "p", "", "Custom path to clone the repository")
+	registerUpdateCmd.Flags().BoolVarP(&registerUpdateAll, "all", "a", false, "Update all registered repositories")
 	registerRemoveCmd.Flags().BoolVarP(&deleteFiles, "delete", "d", false, "Delete local files (moves to backup)")
 }
