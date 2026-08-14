@@ -3,7 +3,10 @@ skill_manger.exe
 .sisyphus
 
 # BEGIN skill_manager managed
-.gemini/skills/golang-patterns
-.gemini/skills/golang-pro
-.gemini/skills/golang-testing
+.agents/skills/go
+.agents/skills/go-release
+.agents/skills/go-spec-reviewer
+.agents/skills/golang-patterns
+.agents/skills/golang-pro
+.agents/skills/golang-testing
 # END skill_manager managed
