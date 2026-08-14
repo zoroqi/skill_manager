@@ -130,3 +130,13 @@ type SummaryConfig struct {
 	Version  string           `json:"version"`
 	Contexts []ContextSummary `json:"contexts"`
 }
+
+type StatItem struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type StatsReport struct {
+	Skills []StatItem `json:"skills"`
+	Groups []StatItem `json:"groups"`
+}
