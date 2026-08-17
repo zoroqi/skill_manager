@@ -140,3 +140,14 @@ type StatsReport struct {
 	Skills []StatItem `json:"skills"`
 	Groups []StatItem `json:"groups"`
 }
+
+type ContextSummaryItem struct {
+	ProjectName string   `json:"project_name"`
+	Dir         string   `json:"dir"`
+	Skills      []string `json:"skills"`
+	Groups      []string `json:"groups"`
+}
+
+type SummaryReport struct {
+	Items []ContextSummaryItem `json:"items"`
+}
