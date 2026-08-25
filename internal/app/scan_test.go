@@ -130,3 +130,59 @@ func TestScanSkills_MultiRegistryIsolation(t *testing.T) {
 	assert.Equal(t, "s2", skills[0].Name)
 	assert.Equal(t, "repo2", skills[0].RegistryName)
 }
+
+func TestScanSkills_TracksDeletedSkills(t *testing.T) {
+	app, configDir := setupApp(t)
+	mgr := store.NewManager(configDir)
+
+	repoDir := t.TempDir()
+	skill1Dir := filepath.Join(repoDir, "skill-a")
+	skill2Dir := filepath.Join(repoDir, "skill-b")
+	os.MkdirAll(skill1Dir, 0755)
+	os.MkdirAll(skill2Dir, 0755)
+	os.WriteFile(filepath.Join(skill1Dir, "SKILL.md"), []byte("# skill-a\nSkill A"), 0644)
+	os.WriteFile(filepath.Join(skill2Dir, "SKILL.md"), []byte("# skill-b\nSkill B"), 0644)
+
+	regCfg := internal.RegistriesConfig{
+		Version: internal.CONFIG_VERSION,
+		Registries: []internal.Registry{
+			{Name: "my_repo", LocalPath: repoDir},
+		},
+	}
+	assert.NoError(t, mgr.SaveRegistriesConfig(regCfg))
+
+	// Initial scan: 2 skills, 0 deleted
+	count, err := app.ScanSkills(repoDir, "my_repo")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	baseCfg, err := mgr.LoadBaseConfig()
+	assert.NoError(t, err)
+	assert.Len(t, baseCfg.Skills, 2)
+	assert.Empty(t, baseCfg.DeletedSkills)
+
+	// Delete skill-b and rescan
+	os.RemoveAll(skill2Dir)
+	count, err = app.ScanSkills(repoDir, "my_repo")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	baseCfg, err = mgr.LoadBaseConfig()
+	assert.NoError(t, err)
+	assert.Len(t, baseCfg.Skills, 1)
+	assert.Equal(t, "skill-a", baseCfg.Skills[0].Name)
+	assert.Len(t, baseCfg.DeletedSkills, 1)
+	assert.Equal(t, "skill-b", baseCfg.DeletedSkills[0].Name)
+
+	// Re-add skill-b and rescan
+	os.MkdirAll(skill2Dir, 0755)
+	os.WriteFile(filepath.Join(skill2Dir, "SKILL.md"), []byte("# skill-b\nSkill B"), 0644)
+	count, err = app.ScanSkills(repoDir, "my_repo")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	baseCfg, err = mgr.LoadBaseConfig()
+	assert.NoError(t, err)
+	assert.Len(t, baseCfg.Skills, 2)
+	assert.Empty(t, baseCfg.DeletedSkills)
+}

@@ -66,8 +66,9 @@ type Skill struct {
 }
 
 type BaseConfig struct {
-	Version string  `json:"version"`
-	Skills  []Skill `json:"skills"`
+	Version       string  `json:"version"`
+	Skills        []Skill `json:"skills"`
+	DeletedSkills []Skill `json:"deleted_skills,omitempty"`
 }
 
 type Group struct {

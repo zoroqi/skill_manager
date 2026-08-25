@@ -207,29 +207,54 @@ func (a *App) cleanupSkills() error {
 
 	validSkills := []internal.Skill{}
 	validSkillIDs := make(map[string]bool)
+	var newlyDeleted []internal.Skill
 
 	for _, s := range cfg.Skills {
 		var skillMdPath string
+		isValid := false
 		if s.RegistryName != "" {
 			physicalBase, ok := regMap[s.RegistryName]
-			if !ok {
-				continue // registry was removed or not found
-			}
-			if filepath.IsAbs(s.Path) {
-				skillMdPath = filepath.Join(s.Path, "SKILL.md")
-			} else {
-				skillMdPath = filepath.Join(physicalBase, s.Path, "SKILL.md")
+			if ok {
+				if filepath.IsAbs(s.Path) {
+					skillMdPath = filepath.Join(s.Path, "SKILL.md")
+				} else {
+					skillMdPath = filepath.Join(physicalBase, s.Path, "SKILL.md")
+				}
+				if _, err := os.Stat(skillMdPath); err == nil {
+					isValid = true
+				}
 			}
 		} else {
 			skillMdPath = filepath.Join(s.Path, "SKILL.md")
+			if _, err := os.Stat(skillMdPath); err == nil {
+				isValid = true
+			}
 		}
 
-		if _, err := os.Stat(skillMdPath); err == nil {
+		if isValid {
 			validSkills = append(validSkills, s)
 			validSkillIDs[s.ID] = true
+		} else {
+			newlyDeleted = append(newlyDeleted, s)
 		}
 	}
 
+	deletedMap := make(map[string]internal.Skill)
+	for _, d := range cfg.DeletedSkills {
+		deletedMap[d.ID] = d
+	}
+	for _, r := range newlyDeleted {
+		deletedMap[r.ID] = r
+	}
+	for _, v := range validSkills {
+		delete(deletedMap, v.ID)
+	}
+
+	newDeleted := make([]internal.Skill, 0, len(deletedMap))
+	for _, d := range deletedMap {
+		newDeleted = append(newDeleted, d)
+	}
+	cfg.DeletedSkills = newDeleted
 	cfg.Skills = validSkills
 	if err := a.store.SaveBaseConfig(cfg); err != nil {
 		return err

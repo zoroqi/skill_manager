@@ -61,3 +61,28 @@ func TestConfigJSONFormat(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(data), `"contexts":[{`)
 }
+
+func TestBaseConfig_DeletedSkills(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := NewManager(tempDir)
+	assert.NoError(t, mgr.Init())
+
+	baseCfg := internal.BaseConfig{
+		Version: internal.CONFIG_VERSION,
+		Skills: []internal.Skill{
+			{ID: "s1", Name: "valid-skill", Path: "/path/valid"},
+		},
+		DeletedSkills: []internal.Skill{
+			{ID: "s2", Name: "deleted-skill", Path: "/path/deleted"},
+		},
+	}
+	assert.NoError(t, mgr.SaveBaseConfig(baseCfg))
+
+	loaded, err := mgr.LoadBaseConfig()
+	assert.NoError(t, err)
+	assert.Len(t, loaded.Skills, 1)
+	assert.Equal(t, "valid-skill", loaded.Skills[0].Name)
+	assert.Len(t, loaded.DeletedSkills, 1)
+	assert.Equal(t, "deleted-skill", loaded.DeletedSkills[0].Name)
+}
+

@@ -113,6 +113,14 @@ func TestCleanupSkills_RemovesOrphanedAndMissingSkills(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, loadedGroups.Groups, 1)
 	assert.ElementsMatch(t, []string{"s1", "s3"}, loadedGroups.Groups[0].SkillIDs)
+
+	// Check DeletedSkills in BaseConfig
+	baseCfgAfter, err := app.store.LoadBaseConfig()
+	assert.NoError(t, err)
+	assert.Len(t, baseCfgAfter.DeletedSkills, 2)
+	deletedNames := []string{baseCfgAfter.DeletedSkills[0].Name, baseCfgAfter.DeletedSkills[1].Name}
+	assert.Contains(t, deletedNames, "missing-local")
+	assert.Contains(t, deletedNames, "orphan-repo-skill")
 }
 
 func TestRegisterRemove_CleansUpSkillsAndGroups(t *testing.T) {
@@ -158,4 +166,11 @@ func TestRegisterRemove_CleansUpSkillsAndGroups(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, groups.Groups, 1)
 	assert.Empty(t, groups.Groups[0].SkillIDs)
+
+	// Check skill-x was recorded in DeletedSkills
+	baseCfgAfter, err := app.store.LoadBaseConfig()
+	assert.NoError(t, err)
+	assert.Len(t, baseCfgAfter.DeletedSkills, 1)
+	assert.Equal(t, "skill-x", baseCfgAfter.DeletedSkills[0].Name)
+	assert.Equal(t, "repo_x", baseCfgAfter.DeletedSkills[0].RegistryName)
 }

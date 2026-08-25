@@ -124,6 +124,14 @@ func (a *App) ListSkills() ([]internal.Skill, error) {
 	return cfg.Skills, nil
 }
 
+func (a *App) GetDeletedSkills() ([]internal.Skill, error) {
+	cfg, err := a.store.LoadBaseConfig()
+	if err != nil {
+		return nil, err
+	}
+	return cfg.DeletedSkills, nil
+}
+
 func (a *App) AddSkill(workDir, skillName, registryName string, agents []string, global, force bool) error {
 	targetDir, ctxCfg, saveCtx, err := a.resolveContext(workDir, global)
 	if err != nil {

@@ -91,26 +91,38 @@ func (m *Manager) SaveBaseConfig(cfg internal.BaseConfig) error {
 			regMap[r.Name] = r
 		}
 
-		for i, s := range cfg.Skills {
-			if s.RegistryName != "" {
-				if r, ok := regMap[s.RegistryName]; ok {
-					physicalPath, err := r.GetPhysicalPath()
-					if err == nil {
-						relPath, err := filepath.Rel(physicalPath, s.Path)
+		relativizeSkills := func(skills []internal.Skill) {
+			for i, s := range skills {
+				if s.RegistryName != "" {
+					if r, ok := regMap[s.RegistryName]; ok {
+						physicalPath, err := r.GetPhysicalPath()
 						if err == nil {
-							cfg.Skills[i].Path = relPath
+							relPath, err := filepath.Rel(physicalPath, s.Path)
+							if err == nil {
+								skills[i].Path = relPath
+							}
 						}
 					}
 				}
 			}
 		}
+
+		relativizeSkills(cfg.Skills)
+		relativizeSkills(cfg.DeletedSkills)
 	}
-	sort.Slice(cfg.Skills, func(i, j int) bool {
-		if cfg.Skills[i].RegistryName == cfg.Skills[j].RegistryName {
-			return cfg.Skills[i].Name < cfg.Skills[j].Name
-		}
-		return cfg.Skills[i].RegistryName < cfg.Skills[j].RegistryName
-	})
+
+	sortSkills := func(skills []internal.Skill) {
+		sort.Slice(skills, func(i, j int) bool {
+			if skills[i].RegistryName == skills[j].RegistryName {
+				return skills[i].Name < skills[j].Name
+			}
+			return skills[i].RegistryName < skills[j].RegistryName
+		})
+	}
+
+	sortSkills(cfg.Skills)
+	sortSkills(cfg.DeletedSkills)
+
 	return m.saveJSON(internal.FILENAME_SKILLS, cfg)
 }
 
@@ -118,7 +130,7 @@ func (m *Manager) LoadBaseConfig() (internal.BaseConfig, error) {
 	var cfg internal.BaseConfig
 	err := m.loadJSON(internal.FILENAME_SKILLS, &cfg)
 	if err != nil && os.IsNotExist(err) {
-		return internal.BaseConfig{Version: internal.CONFIG_VERSION, Skills: []internal.Skill{}}, nil
+		return internal.BaseConfig{Version: internal.CONFIG_VERSION, Skills: []internal.Skill{}, DeletedSkills: []internal.Skill{}}, nil
 	}
 	if err == nil {
 		registries, err := m.LoadRegistriesConfig()
@@ -128,16 +140,21 @@ func (m *Manager) LoadBaseConfig() (internal.BaseConfig, error) {
 				regMap[r.Name] = r
 			}
 
-			for i, s := range cfg.Skills {
-				if s.RegistryName != "" {
-					if r, ok := regMap[s.RegistryName]; ok {
-						physicalPath, err := r.GetPhysicalPath()
-						if err == nil {
-							cfg.Skills[i].Path = filepath.Join(physicalPath, s.Path)
+			resolveSkills := func(skills []internal.Skill) {
+				for i, s := range skills {
+					if s.RegistryName != "" {
+						if r, ok := regMap[s.RegistryName]; ok {
+							physicalPath, err := r.GetPhysicalPath()
+							if err == nil {
+								skills[i].Path = filepath.Join(physicalPath, s.Path)
+							}
 						}
 					}
 				}
 			}
+
+			resolveSkills(cfg.Skills)
+			resolveSkills(cfg.DeletedSkills)
 		}
 	}
 	return cfg, err

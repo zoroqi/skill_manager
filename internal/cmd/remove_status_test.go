@@ -219,6 +219,9 @@ func TestStatusCommand_WarningForMissingSkills(t *testing.T) {
 		Skills: []internal.Skill{
 			{ID: "valid_id", Name: "valid_skill", Path: s1Path},
 		},
+		DeletedSkills: []internal.Skill{
+			{ID: "missing_id_123", Name: "my_removed_skill", RegistryName: "org_repo"},
+		},
 	})
 	assert.NoError(t, err)
 
@@ -253,7 +256,7 @@ func TestStatusCommand_WarningForMissingSkills(t *testing.T) {
 	out := buf.String()
 	assert.Contains(t, out, "valid_skill")
 	assert.Contains(t, out, "Warning: 1 active skill(s) missing or deleted from skills library:")
-	assert.Contains(t, out, "missing_id_123 (agents: gemini, claude)")
+	assert.Contains(t, out, "my_removed_skill (registry: org_repo, id: missing_id_123) (agents: gemini, claude)")
 	assert.Contains(t, out, "Warning: 1 active group(s) missing or deleted from groups library:")
 	assert.Contains(t, out, "missing_group_xyz (agents: gemini)")
 	assert.Contains(t, out, "Please run `skill_manager sync` to clean up invalid skills.")

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -207,6 +208,12 @@ var statusCmd = &cobra.Command{
 		}
 
 		if len(missingSkills) > 0 {
+			deletedSkills, _ := application.GetDeletedSkills()
+			deletedMap := make(map[string]internal.Skill, len(deletedSkills))
+			for _, d := range deletedSkills {
+				deletedMap[d.ID] = d
+			}
+
 			cmd.Println()
 			cmd.Printf("Warning: %d active skill(s) missing or deleted from skills library:\n", len(missingSkills))
 			for _, m := range missingSkills {
@@ -214,7 +221,15 @@ var statusCmd = &cobra.Command{
 				if len(m.Agents) > 0 {
 					agentsStr = strings.Join(m.Agents, ", ")
 				}
-				cmd.Printf("  - %s (agents: %s)\n", m.ID, agentsStr)
+				nameStr := m.ID
+				if d, ok := deletedMap[m.ID]; ok && d.Name != "" {
+					if d.RegistryName != "" {
+						nameStr = fmt.Sprintf("%s (registry: %s, id: %s)", d.Name, d.RegistryName, m.ID)
+					} else {
+						nameStr = fmt.Sprintf("%s (id: %s)", d.Name, m.ID)
+					}
+				}
+				cmd.Printf("  - %s (agents: %s)\n", nameStr, agentsStr)
 			}
 		}
 
