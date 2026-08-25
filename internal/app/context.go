@@ -33,6 +33,23 @@ func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, forc
 
 	existingAgents := store.FindExistingAgents(targetDir)
 
+	// Filter and prune invalid ActiveSkills & ActiveGroups from ctxCfg
+	var validActiveSkills []internal.SkillUsage
+	for _, usage := range ctxCfg.ActiveSkills {
+		if _, ok := skillMap[usage.ID]; ok {
+			validActiveSkills = append(validActiveSkills, usage)
+		}
+	}
+	ctxCfg.ActiveSkills = validActiveSkills
+
+	var validActiveGroups []internal.GroupUsage
+	for _, usage := range ctxCfg.ActiveGroups {
+		if _, ok := groupMap[usage.Name]; ok {
+			validActiveGroups = append(validActiveGroups, usage)
+		}
+	}
+	ctxCfg.ActiveGroups = validActiveGroups
+
 	// 1. Process InactiveSkills for lookup
 	inactive := make(map[string]map[string]bool) // skillName -> agent -> true
 	for _, usage := range ctxCfg.InactiveSkills {
@@ -211,11 +228,14 @@ func (a *App) syncContext(targetDir string, ctxCfg *internal.ContextConfig, forc
 }
 
 func (a *App) SyncContext(workDir string, global, force bool) error {
-	targetDir, ctxCfg, _, err := a.resolveContext(workDir, global)
+	targetDir, ctxCfg, saveCtx, err := a.resolveContext(workDir, global)
 	if err != nil {
 		return err
 	}
-	return a.syncContext(targetDir, ctxCfg, force, global)
+	if err := a.syncContext(targetDir, ctxCfg, force, global); err != nil {
+		return err
+	}
+	return saveCtx()
 }
 
 func (a *App) GetStatus(workDir string, global bool) (internal.ContextConfig, []internal.Skill, []internal.Group, error) {

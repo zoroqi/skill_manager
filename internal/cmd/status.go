@@ -91,10 +91,12 @@ var statusCmd = &cobra.Command{
 			}
 		}
 
+		var missingSkills []internal.SkillUsage
 		// Process User Added (Highest priority)
 		for _, usage := range ctxCfg.ActiveSkills {
 			skill, ok := skillMap[usage.ID]
 			if !ok {
+				missingSkills = append(missingSkills, usage)
 				continue
 			}
 			agents := usage.Agents
@@ -107,6 +109,7 @@ var statusCmd = &cobra.Command{
 		}
 
 		// Process Groups (Lower priority, sorted)
+		var missingGroups []internal.GroupUsage
 		sortedGroups := make([]internal.GroupUsage, len(ctxCfg.ActiveGroups))
 		copy(sortedGroups, ctxCfg.ActiveGroups)
 		sort.Slice(sortedGroups, func(i, j int) bool {
@@ -116,6 +119,7 @@ var statusCmd = &cobra.Command{
 		for _, usage := range sortedGroups {
 			group, ok := groupMap[usage.Name]
 			if !ok {
+				missingGroups = append(missingGroups, usage)
 				continue
 			}
 			agents := usage.Agents
@@ -199,6 +203,38 @@ var statusCmd = &cobra.Command{
 					reg,
 					strings.Join(agents, "/"),
 					strings.Join(sources, ", "))
+			}
+		}
+
+		if len(missingSkills) > 0 {
+			cmd.Println()
+			cmd.Printf("Warning: %d active skill(s) missing or deleted from skills library:\n", len(missingSkills))
+			for _, m := range missingSkills {
+				agentsStr := "all agents"
+				if len(m.Agents) > 0 {
+					agentsStr = strings.Join(m.Agents, ", ")
+				}
+				cmd.Printf("  - %s (agents: %s)\n", m.ID, agentsStr)
+			}
+		}
+
+		if len(missingGroups) > 0 {
+			cmd.Println()
+			cmd.Printf("Warning: %d active group(s) missing or deleted from groups library:\n", len(missingGroups))
+			for _, m := range missingGroups {
+				agentsStr := "all agents"
+				if len(m.Agents) > 0 {
+					agentsStr = strings.Join(m.Agents, ", ")
+				}
+				cmd.Printf("  - %s (agents: %s)\n", m.Name, agentsStr)
+			}
+		}
+
+		if len(missingSkills) > 0 || len(missingGroups) > 0 {
+			if statusGlobal {
+				cmd.Println("\nPlease run `skill_manager sync -g` to clean up invalid skills.")
+			} else {
+				cmd.Println("\nPlease run `skill_manager sync` to clean up invalid skills.")
 			}
 		}
 

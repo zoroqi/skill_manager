@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -197,3 +198,86 @@ func TestRefactoredLogic(t *testing.T) {
 	}
 	assert.True(t, foundMask)
 }
+
+func TestStatusCommand_WarningForMissingSkills(t *testing.T) {
+	tempDir := t.TempDir()
+
+	configDir := filepath.Join(tempDir, ".skill_manager")
+	os.Setenv("SKILL_MANAGER_CONFIG", configDir)
+	defer os.Unsetenv("SKILL_MANAGER_CONFIG")
+
+	manager := store.NewManager(configDir)
+	err := manager.Init()
+	assert.NoError(t, err)
+
+	s1Path := filepath.Join(tempDir, "s1")
+	os.MkdirAll(s1Path, 0755)
+	os.WriteFile(filepath.Join(s1Path, "SKILL.md"), []byte("# valid-skill"), 0644)
+
+	err = manager.SaveBaseConfig(internal.BaseConfig{
+		Version: internal.CONFIG_VERSION,
+		Skills: []internal.Skill{
+			{ID: "valid_id", Name: "valid_skill", Path: s1Path},
+		},
+	})
+	assert.NoError(t, err)
+
+	projectDir := filepath.Join(tempDir, "project")
+	os.MkdirAll(projectDir, 0755)
+	oldWd, _ := os.Getwd()
+	os.Chdir(projectDir)
+	defer os.Chdir(oldWd)
+
+	// Set context with missing skill and missing group
+	ctxCfg := internal.ContextConfig{
+		Version: internal.CONFIG_VERSION,
+		Scope:   "test-proj",
+		ActiveSkills: []internal.SkillUsage{
+			{ID: "valid_id", Agents: []string{"gemini"}},
+			{ID: "missing_id_123", Agents: []string{"gemini", "claude"}},
+		},
+		ActiveGroups: []internal.GroupUsage{
+			{Name: "missing_group_xyz", Agents: []string{"gemini"}},
+		},
+	}
+	assert.NoError(t, store.SaveLocalContext(projectDir, ctxCfg))
+
+	// Run status
+	statusGlobal = false
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetArgs([]string{"status"})
+	err = rootCmd.Execute()
+	assert.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "valid_skill")
+	assert.Contains(t, out, "Warning: 1 active skill(s) missing or deleted from skills library:")
+	assert.Contains(t, out, "missing_id_123 (agents: gemini, claude)")
+	assert.Contains(t, out, "Warning: 1 active group(s) missing or deleted from groups library:")
+	assert.Contains(t, out, "missing_group_xyz (agents: gemini)")
+	assert.Contains(t, out, "Please run `skill_manager sync` to clean up invalid skills.")
+
+	// Test Global status warning
+	globalCtx := internal.ContextConfig{
+		Version: internal.CONFIG_VERSION,
+		Scope:   "global",
+		ActiveSkills: []internal.SkillUsage{
+			{ID: "global_missing_id", Agents: []string{}},
+		},
+	}
+	assert.NoError(t, manager.SaveContextConfig(globalCtx, internal.FILENAME_GLOBAL_CONTEXT))
+
+	statusGlobal = true
+	bufGlobal := new(bytes.Buffer)
+	rootCmd.SetOut(bufGlobal)
+	rootCmd.SetArgs([]string{"status", "-g"})
+	err = rootCmd.Execute()
+	assert.NoError(t, err)
+
+	outGlobal := bufGlobal.String()
+	assert.Contains(t, outGlobal, "Warning: 1 active skill(s) missing or deleted from skills library:")
+	assert.Contains(t, outGlobal, "global_missing_id (agents: all agents)")
+	assert.Contains(t, outGlobal, "Please run `skill_manager sync -g` to clean up invalid skills.")
+}
+
