@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -18,6 +19,11 @@ func (a *App) GetSummaryReport() (*internal.SummaryReport, error) {
 
 	for _, ctxSummary := range summaryCfg.Contexts {
 		global := ctxSummary.Dir == "global"
+		if !global {
+			if _, err := os.Stat(ctxSummary.ConfigPath); err != nil {
+				continue
+			}
+		}
 		ctxCfg, skills, _, err := a.GetStatus(ctxSummary.Dir, global)
 		if err != nil {
 			// Skip context if failed to load

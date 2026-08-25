@@ -1,38 +1,51 @@
 package app
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/zoroqi/skill_manager/internal"
 	"github.com/zoroqi/skill_manager/internal/scanner"
 )
 
 func (a *App) ScanSkills(dir string, registryName string) (int, error) {
-
 	cfg, err := a.store.LoadBaseConfig()
 	if err != nil {
 		return 0, err
 	}
 
 	skills, err := scanner.Scan(dir, registryName)
-	if err != nil || len(skills) == 0 {
+	if err != nil {
 		return 0, err
 	}
 
-	skillMap := make(map[string]internal.Skill)
-	for _, s := range cfg.Skills {
-		skillMap[s.ID] = s
-	}
-	for _, s := range skills {
-		skillMap[s.ID] = s
+	var remainingSkills []internal.Skill
+	if registryName != "" {
+		for _, s := range cfg.Skills {
+			if s.RegistryName != registryName {
+				remainingSkills = append(remainingSkills, s)
+			}
+		}
+	} else {
+		absDir, err := filepath.Abs(dir)
+		if err != nil {
+			absDir = dir
+		}
+		for _, s := range cfg.Skills {
+			if s.RegistryName != "" || !strings.HasPrefix(s.Path, absDir) {
+				remainingSkills = append(remainingSkills, s)
+			}
+		}
 	}
 
-	newSkills := make([]internal.Skill, 0, len(skillMap))
-	for _, s := range skillMap {
-		newSkills = append(newSkills, s)
-	}
-	cfg.Skills = newSkills
+	cfg.Skills = append(remainingSkills, skills...)
 
 	if err := a.store.SaveBaseConfig(cfg); err != nil {
 		return 0, err
 	}
+
+	_ = a.cleanupSkills()
+
 	return len(skills), nil
 }
+

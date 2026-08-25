@@ -183,27 +183,79 @@ func (a *App) RegisterRemove(name string, deleteFiles bool) error {
 		}
 	}
 
-	// Cleanup skills.json (re-scan overall or just remove stale entries)
-	// For now, let's just trigger a full scan of all remaining registries and other known paths
-	// Actually, the current ScanSkills just adds or updates. It doesn't remove.
-	// We might need a "CleanSkills" or a way to remove skills that no longer exist on disk.
+	// Cleanup skills.json and groups.json
 	return a.cleanupSkills()
 }
 
 func (a *App) cleanupSkills() error {
+	registriesCfg, err := a.store.LoadRegistriesConfig()
+	if err != nil {
+		return err
+	}
+
+	regMap := make(map[string]string)
+	for _, r := range registriesCfg.Registries {
+		if p, err := r.GetPhysicalPath(); err == nil {
+			regMap[r.Name] = p
+		}
+	}
+
 	cfg, err := a.store.LoadBaseConfig()
 	if err != nil {
 		return err
 	}
 
 	validSkills := []internal.Skill{}
+	validSkillIDs := make(map[string]bool)
+
 	for _, s := range cfg.Skills {
-		if _, err := os.Stat(s.Path); err == nil {
+		var skillMdPath string
+		if s.RegistryName != "" {
+			physicalBase, ok := regMap[s.RegistryName]
+			if !ok {
+				continue // registry was removed or not found
+			}
+			if filepath.IsAbs(s.Path) {
+				skillMdPath = filepath.Join(s.Path, "SKILL.md")
+			} else {
+				skillMdPath = filepath.Join(physicalBase, s.Path, "SKILL.md")
+			}
+		} else {
+			skillMdPath = filepath.Join(s.Path, "SKILL.md")
+		}
+
+		if _, err := os.Stat(skillMdPath); err == nil {
 			validSkills = append(validSkills, s)
+			validSkillIDs[s.ID] = true
 		}
 	}
+
 	cfg.Skills = validSkills
-	return a.store.SaveBaseConfig(cfg)
+	if err := a.store.SaveBaseConfig(cfg); err != nil {
+		return err
+	}
+
+	// Clean up invalid skill IDs in groups.json
+	groupsCfg, err := a.store.LoadGroupsConfig()
+	if err == nil {
+		changed := false
+		for i, g := range groupsCfg.Groups {
+			var newIDs []string
+			for _, id := range g.SkillIDs {
+				if validSkillIDs[id] {
+					newIDs = append(newIDs, id)
+				} else {
+					changed = true
+				}
+			}
+			groupsCfg.Groups[i].SkillIDs = newIDs
+		}
+		if changed {
+			_ = a.store.SaveGroupsConfig(groupsCfg)
+		}
+	}
+
+	return nil
 }
 
 func (a *App) resolveRegisterPath(customPath, name string) (string, string, error) {
