@@ -125,15 +125,15 @@ type SummaryReport struct {
 
 本次開發順利完成了「Summary 功能」的設計與實現：
 1. **清晰的架構分層**：
-   - 數據模型定義在 [`internal/types.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/types.go) (`ContextSummaryItem` 與 `SummaryReport`)。
-   - 業務提取與去重排序邏輯封裝在 [`internal/app/summary.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/app/summary.go) (`GetSummaryReport`)。
-   - CLI 命令行交互與 `tabwriter` 表格格式化輸出封裝在 [`internal/cmd/summary.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/cmd/summary.go)。
+   - 數據模型定義在 [`internal/types.go`](skill_manager/internal/types.go) (`ContextSummaryItem` 與 `SummaryReport`)。
+   - 業務提取與去重排序邏輯封裝在 [`internal/app/summary.go`](skill_manager/internal/app/summary.go) (`GetSummaryReport`)。
+   - CLI 命令行交互與 `tabwriter` 表格格式化輸出封裝在 [`internal/cmd/summary.go`](skill_manager/internal/cmd/summary.go)。
 2. **靈活且嚴謹的展示邏輯**：
    - 遍歷 `summary.json` 中的所有 context（包含 `global` 與各項目環境）。
    - 自動映射技能名稱，並對項目內的技能與群組進行去重及字母序排序。
    - 採用多行緊湊對齊算法，技能與群組各自獨立並排輸出，首行展示項目名稱，後續行對齊展示各技能/群組。
    - 具備健壯的容錯能力：若 context 設定檔不存在或損毀，安全跳過，不中斷整體輸出。
 3. **完整的測試覆蓋**：
-   - 單元測試 [`internal/app/summary_test.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/app/summary_test.go) 涵蓋空狀態、多項目、去重排序、自定義 scope、未知技能 ID 容錯及不存在路徑處理。
-   - CLI 整合測試 [`internal/cmd/summary_test.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/cmd/summary_test.go) 驗證了標準輸出、多行對齊與命令別名 (`summaries`)。
+   - 單元測試 [`internal/app/summary_test.go`](skill_manager/internal/app/summary_test.go) 涵蓋空狀態、多項目、去重排序、自定義 scope、未知技能 ID 容錯及不存在路徑處理。
+   - CLI 整合測試 [`internal/cmd/summary_test.go`](skill_manager/internal/cmd/summary_test.go) 驗證了標準輸出、多行對齊與命令別名 (`summaries`)。
    - 全量測試 `go test ./...` 100% 通過。

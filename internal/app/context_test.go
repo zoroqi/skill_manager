@@ -82,4 +82,3 @@ func TestSyncContext_PrunesInvalidActiveSkillsAndGroups(t *testing.T) {
 	assert.Len(t, savedCtx.ActiveGroups, 1)
 	assert.Equal(t, "valid_group", savedCtx.ActiveGroups[0].Name)
 }
-

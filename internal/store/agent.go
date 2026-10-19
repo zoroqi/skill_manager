@@ -34,20 +34,3 @@ func FindExistingAgents(targetDir string) []string {
 	}
 	return existing
 }
-
-func RemoveAgentSymlinks(targetDir, skillName string, agents []string) error {
-	if len(agents) == 0 {
-		agents = FindExistingAgents(targetDir)
-	}
-	for _, a := range agents {
-		skillsDir := filepath.Join(targetDir, GetAgentDir(a), "skills")
-		linkPath := filepath.Join(skillsDir, skillName)
-
-		if _, err := os.Lstat(linkPath); err == nil {
-			if err := os.Remove(linkPath); err != nil {
-				return fmt.Errorf("failed to remove symlink %s: %w", linkPath, err)
-			}
-		}
-	}
-	return nil
-}

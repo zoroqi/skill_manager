@@ -283,4 +283,3 @@ func TestStatusCommand_WarningForMissingSkills(t *testing.T) {
 	assert.Contains(t, outGlobal, "global_missing_id (agents: all agents)")
 	assert.Contains(t, outGlobal, "Please run `skill_manager sync -g` to clean up invalid skills.")
 }
-

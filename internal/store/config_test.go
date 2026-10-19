@@ -85,4 +85,3 @@ func TestBaseConfig_DeletedSkills(t *testing.T) {
 	assert.Len(t, loaded.DeletedSkills, 1)
 	assert.Equal(t, "deleted-skill", loaded.DeletedSkills[0].Name)
 }
-

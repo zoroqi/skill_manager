@@ -74,4 +74,3 @@ func (a *App) ScanSkills(dir string, registryName string) (int, error) {
 
 	return len(skills), nil
 }
-

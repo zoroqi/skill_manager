@@ -1,6 +1,7 @@
 skill_manager
 skill_manger.exe
 .sisyphus
+*_test.go
 
 # BEGIN skill_manager managed
 .agents/skills/go

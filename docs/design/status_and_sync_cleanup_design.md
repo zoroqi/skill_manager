@@ -13,10 +13,10 @@
 ## 2. 現狀問題與分析 (Current Problem & Analysis)
 
 1. **`status` 命令缺少失效提醒**：
-   - 目前 [`internal/cmd/status.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/cmd/status.go) 遍歷 `ctxCfg.ActiveSkills` 時，若 `skillMap[usage.ID]` 不存在則直接 `continue` 跳過。
+   - 目前 [`internal/cmd/status.go`](skill_manager/internal/cmd/status.go) 遍歷 `ctxCfg.ActiveSkills` 時，若 `skillMap[usage.ID]` 不存在則直接 `continue` 跳過。
    - 使用者無法得知哪些手動添加的技能已經失效，也無從得知為何某些技能不再生效。
 2. **`sync` 命令未清理 Context 內部無效引用**：
-   - 在 [`internal/app/context.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/app/context.go) 的 `syncContext` 中，遇到無效的 `usage.ID` 僅在內存中略過軟鏈建立，但並未從 `ctxCfg.ActiveSkills` 中剔除該記錄，也未回寫到配置文件。
+   - 在 [`internal/app/context.go`](skill_manager/internal/app/context.go) 的 `syncContext` 中，遇到無效的 `usage.ID` 僅在內存中略過軟鏈建立，但並未從 `ctxCfg.ActiveSkills` 中剔除該記錄，也未回寫到配置文件。
    - 導致 `.skills_manager.json` 或 `global.json` 永久殘留失效的技能 ID。
 
 ---
@@ -100,15 +100,15 @@ cmd/status.go, sync.go  ──→  app/context.go  ──→  store
 本次開發順利完成了 `status` 與 `sync` 命令在面對失效技能時的提示與自癒清理功能：
 
 1. **`status` 命令透明度提升**：
-   - 在 [`internal/cmd/status.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/cmd/status.go) 中增加了對 Context 中無效 `ActiveSkills` 與 `ActiveGroups` 的收集與判斷。
+   - 在 [`internal/cmd/status.go`](skill_manager/internal/cmd/status.go) 中增加了對 Context 中無效 `ActiveSkills` 與 `ActiveGroups` 的收集與判斷。
    - 在狀態表格底部明確輸出 Warning 警告，列出失效項目與關聯 Agent，並提示用戶執行 `skill_manager sync`（全局模式下為 `skill_manager sync -g`）進行修復。
 
 2. **`sync` 命令自癒與配置持久化**：
-   - 在 [`internal/app/context.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/app/context.go) 的 `syncContext` 中，對 `ctxCfg.ActiveSkills` 與 `ctxCfg.ActiveGroups` 進行過濾，僅保留存在於當前技能庫中的有效項目。
+   - 在 [`internal/app/context.go`](skill_manager/internal/app/context.go) 的 `syncContext` 中，對 `ctxCfg.ActiveSkills` 與 `ctxCfg.ActiveGroups` 進行過濾，僅保留存在於當前技能庫中的有效項目。
    - 在 `SyncContext` 中調用 `saveCtx()`，將清理後的 Context 狀態寫回磁盤（`.skills_manager.json` 或 `global.json`）。
    - 配合既有的孤兒軟鏈清理邏輯，徹底清除已失效技能的物理軟鏈與配置殘留。
 
 3. **完整測試保障**：
-   - 單元測試 [`internal/app/context_test.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/app/context_test.go) 驗證了 `SyncContext` 對無效技能與群組的過濾與持久化寫入。
-   - CLI 測試 [`internal/cmd/remove_status_test.go`](file:///Users/zoroqi/work/golang/src/zoroqi/skill_manager/internal/cmd/remove_status_test.go) 驗證了局部與全局 `status` 命令的警告輸出與修復指令提示。
+   - 單元測試 [`internal/app/context_test.go`](skill_manager/internal/app/context_test.go) 驗證了 `SyncContext` 對無效技能與群組的過濾與持久化寫入。
+   - CLI 測試 [`internal/cmd/remove_status_test.go`](skill_manager/internal/cmd/remove_status_test.go) 驗證了局部與全局 `status` 命令的警告輸出與修復指令提示。
    - 全量測試套件 `go test ./...` 100% 通過。
